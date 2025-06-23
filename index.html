@@ -233,15 +233,25 @@
                     if (!dateParts) continue;
                     
                     const [, day, month, year, hour, minute] = dateParts;
-                    const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
-                    if (isNaN(timestamp.getTime())) continue;
+                    const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
+                    if (isNaN(originalTimestamp.getTime())) continue;
+
+                    // Group half-hourly data into hourly buckets.
+                    const hourBucketTimestamp = new Date(originalTimestamp);
+                    // A reading at 13:00 is for the interval ending at 13:00 (i.e., 12:30-13:00).
+                    // This belongs to the 12:00-13:00 hour. So, subtract a microsecond to put it in the correct hour bucket.
+                    if (hourBucketTimestamp.getUTCMinutes() === 0 && hourBucketTimestamp.getUTCSeconds() === 0) {
+                         hourBucketTimestamp.setTime(hourBucketTimestamp.getTime() - 1);
+                    }
+                    hourBucketTimestamp.setUTCMinutes(0, 0, 0); // Set to the start of the hour.
+                    
+                    const key = hourBucketTimestamp.toISOString();
 
                     const readType = values[typeIndex]?.trim().replace(/"/g, '');
                     const readValue = parseFloat(values[valueIndex]);
                     if (!readType || isNaN(readValue)) continue;
 
-                    const key = timestamp.toISOString();
-                    if (!dataMap.has(key)) dataMap.set(key, { timestamp, consumption: 0, generation: 0 });
+                    if (!dataMap.has(key)) dataMap.set(key, { timestamp: hourBucketTimestamp, consumption: 0, generation: 0 });
                     
                     const entry = dataMap.get(key);
                     if (readType.toLowerCase().includes('active import')) entry.consumption += readValue;
@@ -268,18 +278,11 @@
             }
 
             function runSimulation(data, params) {
-                let batterySoC = 0, totalImportWithoutBattery = 0, totalImportWithBattery = 0,
-                    totalExportWithBattery = 0, totalConsumption = 0, totalGeneration = 0,
-                    totalChargedToBattery = 0, totalDischargedFromBattery = 0;
-
-                const timeStepHours = 0.5;
-                const maxChargePower = params.maxChargeRate * timeStepHours;
-                const maxDischargePower = params.maxDischargeRate * timeStepHours;
-                const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
-
+                let batterySoC = 0;
                 const monthlyData = {};
-
-                for (const row of data) {
+                
+                // Initialize monthly data buckets
+                data.forEach(row => {
                     const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`;
                     if (!monthlyData[monthKey]) {
                         monthlyData[monthKey] = {
@@ -288,7 +291,18 @@
                             savings: 0, costWithoutBattery: 0, costWithBattery: 0, exportRevenue: 0
                         };
                     }
+                });
+
+
+                for (const row of data) {
+                    const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`;
                     const m = monthlyData[monthKey];
+                    
+                    const timeStepHours = 1.0; // Data is now hourly
+                    const maxChargePower = params.maxChargeRate * timeStepHours;
+                    const maxDischargePower = params.maxDischargeRate * timeStepHours;
+                    const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
+
                     m.consumption += row.consumption;
                     m.generation += row.generation;
                     
@@ -325,15 +339,14 @@
                     m.dischargedFromBattery += dischargedFromBattery;
                 }
 
+                let totalImportWithoutBattery = 0, totalImportWithBattery = 0, totalExportWithBattery = 0, totalConsumption = 0;
+
                 // Aggregate totals and calculate financials
                 Object.values(monthlyData).forEach(m => {
                     totalConsumption += m.consumption;
-                    totalGeneration += m.generation;
                     totalImportWithoutBattery += m.importWithoutBattery;
                     totalImportWithBattery += m.importWithBattery;
                     totalExportWithBattery += m.exportWithBattery;
-                    totalChargedToBattery += m.chargedToBattery;
-                    totalDischargedFromBattery += m.dischargedFromBattery;
                     
                     m.costWithoutBattery = m.importWithoutBattery * params.importPrice;
                     m.costWithBattery = m.importWithBattery * params.importPrice;
@@ -341,7 +354,7 @@
                     m.savings = m.costWithoutBattery - (m.costWithBattery - m.exportRevenue);
                 });
 
-                const daysInData = data.length * timeStepHours / 24;
+                const daysInData = data.length / 24; // data length is now number of hours
                 const scalingFactor = daysInData > 0 ? 365 / daysInData : 1;
 
                 const annualSavings = (totalImportWithoutBattery - totalImportWithBattery) * params.importPrice * scalingFactor + (totalExportWithBattery * params.exportPrice * scalingFactor);
@@ -356,11 +369,11 @@
             }
             
             function generateChartDataForMonth(dataForMonth, params) {
-                const intervalsInDay = 48;
+                const intervalsInDay = 24; // Now 24 hours in a day
                 let bestDayIndex = 0, maxVariance = 0;
                 
                 if (dataForMonth.length >= intervalsInDay) {
-                    for (let i = 0; i <= dataForMonth.length - intervalsInDay; i += intervalsInDay) {
+                    for (let i = 0; i <= dataForMonth.length - intervalsInDay; i++) { // Step by 1 day (24 hours)
                         const dayDataSlice = dataForMonth.slice(i, i + intervalsInDay);
                         const variance = dayDataSlice.reduce((sum, r) => sum + Math.abs(r.generation - r.consumption), 0);
                         if (variance > maxVariance) {
@@ -375,7 +388,7 @@
                 
                 let batterySoC = 0;
                 const chartSeries = { labels: [], consumption: [], generation: [], batteryCharge: [], batteryDischarge: [], gridImport: [], gridExport: [] };
-                const timeStepHours = 0.5, maxChargePower = params.maxChargeRate * timeStepHours, maxDischargePower = params.maxDischargeRate * timeStepHours;
+                const timeStepHours = 1.0, maxChargePower = params.maxChargeRate * timeStepHours, maxDischargePower = params.maxDischargeRate * timeStepHours;
                 const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
                 
                 for (const row of dayData) {
@@ -424,7 +437,6 @@
                 document.getElementById('paybackPeriod').textContent = isFinite(simulationResults.paybackPeriod) ? `${simulationResults.paybackPeriod.toFixed(1)} years` : 'Never';
                 document.getElementById('selfSufficiency').textContent = `${simulationResults.selfSufficiency.toFixed(1)}%`;
                 
-                // Populate month selector
                 monthSelector.innerHTML = '';
                 const monthKeys = Object.keys(simulationResults.monthlyData).sort();
                 monthKeys.forEach(key => {
@@ -435,7 +447,6 @@
                     monthSelector.appendChild(option);
                 });
                 
-                // Display the first month by default
                 if (monthKeys.length > 0) {
                     updateMonthlyView(monthKeys[0]);
                 }
@@ -445,7 +456,6 @@
                 const params = getSimulationParameters();
                 const dataForMonth = fullData.filter(d => `${d.timestamp.getFullYear()}-${(d.timestamp.getMonth() + 1).toString().padStart(2, '0')}` === monthKey);
                 
-                // Update chart
                 const chartData = generateChartDataForMonth(dataForMonth, params);
                 const [year, month] = monthKey.split('-');
                 const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -457,7 +467,6 @@
                     energyChart = new Chart(ctx, getChartConfig(chartData));
                 }
                 
-                // Update monthly summary
                 const monthSummary = simulationResults.monthlyData[monthKey];
                 document.getElementById('summaryMonth').textContent = monthName;
                 const summaryList = document.getElementById('monthlySummaryList');
@@ -497,7 +506,7 @@
                        responsive: true, maintainAspectRatio: false,
                        plugins: {
                            tooltip: { mode: 'index', intersect: false },
-                           title: { display: true, text: 'Energy Flow (kWh per 30 minutes)', font: { size: 16 } },
+                           title: { display: true, text: 'Energy Flow (kWh per hour)', font: { size: 16 } },
                            legend: { position: 'top' },
                        },
                        scales: {
