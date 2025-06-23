@@ -30,6 +30,9 @@
         .result-value {
             @apply text-3xl font-bold text-gray-900 dark:text-white mt-1;
         }
+        .hourly-rate-grid {
+            @apply grid grid-cols-4 sm:grid-cols-6 gap-2;
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
@@ -45,26 +48,15 @@
             <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg self-start sticky top-8">
                 <h2 class="text-2xl font-semibold mb-6 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
 
-                <!-- Step 1: Data Upload -->
                 <div class="mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">1. Upload HDF File</h3>
                     <div class="input-group">
                         <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
-                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 dark:text-gray-400
-                            file:mr-4 file:py-2 file:px-4
-                            file:rounded-md file:border-0
-                            file:text-sm file:font-semibold
-                            file:bg-indigo-50 dark:file:bg-indigo-900/50
-                            file:text-indigo-700 dark:file:text-indigo-300
-                            hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900
-                        ">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                           Download your HDF file from the ESB Networks website. The app will parse it automatically.
-                        </p>
+                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Download your HDF file from the ESB Networks website.</p>
                     </div>
                 </div>
 
-                <!-- Step 2: Battery Settings -->
                 <div class="mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">2. Battery System</h3>
                     <div class="grid grid-cols-2 gap-4">
@@ -73,19 +65,52 @@
                         <div class="input-group"><label for="chargeRate" class="input-label">Charge/Discharge (kW)</label><input type="number" id="chargeRate" class="input-field" value="5"></div>
                         <div class="input-group"><label for="roundtripEfficiency" class="input-label">Efficiency (%)</label><input type="number" id="roundtripEfficiency" class="input-field" value="90"></div>
                     </div>
+                     <div class="input-group">
+                        <label for="strategySelector" class="input-label">Battery Strategy</label>
+                        <select id="strategySelector" class="input-field">
+                            <option value="self-consumption" selected>Self-Consumption</option>
+                            <option value="price-arbitrage">Price Arbitrage</option>
+                        </select>
+                    </div>
                 </div>
 
-                <!-- Step 3: Financials -->
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
-                     <div class="grid grid-cols-2 gap-4">
-                        <div class="input-group"><label for="importPrice" class="input-label">Import Price (€/kWh)</label><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
-                        <div class="input-group"><label for="exportPrice" class="input-label">Export Tariff (€/kWh)</label><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
-                     </div>
                      <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
+                     
+                     <div class="flex items-center space-x-4 mb-4">
+                         <label class="input-label">Tariff Type:</label>
+                         <div class="flex items-center">
+                             <input type="radio" id="tariffTypeFlat" name="tariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                             <label for="tariffTypeFlat" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Flat Rate</label>
+                         </div>
+                         <div class="flex items-center">
+                             <input type="radio" id="tariffTypeHourly" name="tariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                             <label for="tariffTypeHourly" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Hourly</label>
+                         </div>
+                     </div>
+                     
+                     <div id="flatRateSection">
+                         <div class="grid grid-cols-2 gap-4">
+                            <div class="input-group"><label for="importPrice" class="input-label">Import Price (€/kWh)</label><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
+                            <div class="input-group"><label for="exportPrice" class="input-label">Export Tariff (€/kWh)</label><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
+                         </div>
+                     </div>
+
+                     <div id="hourlyRateSection" class="hidden">
+                        <div class="mb-4">
+                            <h4 class="font-medium text-md mb-2">Hourly Import Rates (€/kWh)</h4>
+                            <div id="hourlyImportGrid" class="hourly-rate-grid"></div>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-md mb-2">Hourly Export Rates (€/kWh)</h4>
+                            <div id="hourlyExportGrid" class="hourly-rate-grid"></div>
+                        </div>
+                     </div>
+
                 </div>
 
-                <button id="calculateBtn" class="w-full mt-4 bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center">
+                <button id="calculateBtn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center">
                     <i data-lucide="calculator" class="mr-2"></i>Run Simulation
                 </button>
                 <p id="status" class="text-center mt-4 text-sm text-gray-500 dark:text-gray-400"></p>
@@ -116,9 +141,7 @@
                     <div class="xl:col-span-2">
                          <div class="result-card p-4">
                             <h3 class="font-semibold text-lg mb-2">Summary for <span id="summaryMonth"></span></h3>
-                            <ul class="space-y-2 text-sm" id="monthlySummaryList">
-                                <!-- Monthly data will be injected here -->
-                            </ul>
+                            <ul class="space-y-2 text-sm" id="monthlySummaryList"></ul>
                         </div>
                     </div>
                 </div>
@@ -142,16 +165,42 @@
             let energyChart = null;
 
             // --- DOM Element References ---
-            const csvFileInput = document.getElementById('csvFile');
             const calculateBtn = document.getElementById('calculateBtn');
             const statusEl = document.getElementById('status');
             const resultsPanel = document.getElementById('resultsPanel');
             const welcomePanel = document.getElementById('welcomePanel');
             const monthSelector = document.getElementById('monthSelector');
+            const flatRateSection = document.getElementById('flatRateSection');
+            const hourlyRateSection = document.getElementById('hourlyRateSection');
 
-            // --- Main Event Listener ---
-            calculateBtn.addEventListener('click', () => {
-                const file = csvFileInput.files[0];
+            // --- Initial Setup ---
+            function createHourlyRateInputs() {
+                const importGrid = document.getElementById('hourlyImportGrid');
+                const exportGrid = document.getElementById('hourlyExportGrid');
+                importGrid.innerHTML = '';
+                exportGrid.innerHTML = '';
+                for (let i = 0; i < 24; i++) {
+                    const hour = i.toString().padStart(2, '0');
+                    importGrid.innerHTML += `<div><label class="text-xs">${hour}:00</label><input type="number" class="input-field text-sm p-1" id="import-rate-${i}" value="0.35" step="0.01"></div>`;
+                    exportGrid.innerHTML += `<div><label class="text-xs">${hour}:00</label><input type="number" class="input-field text-sm p-1" id="export-rate-${i}" value="0.15" step="0.01"></div>`;
+                }
+            }
+            createHourlyRateInputs();
+            lucide.createIcons();
+
+            // --- Event Listeners ---
+            document.getElementById('calculateBtn').addEventListener('click', runFullSimulation);
+            document.getElementById('monthSelector').addEventListener('change', (e) => updateMonthlyView(e.target.value));
+            document.querySelectorAll('input[name="tariffType"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    flatRateSection.classList.toggle('hidden', e.target.value !== 'flat');
+                    hourlyRateSection.classList.toggle('hidden', e.target.value !== 'hourly');
+                });
+            });
+
+            // --- Functions ---
+            function runFullSimulation() {
+                const file = document.getElementById('csvFile').files[0];
                 if (!file) {
                     setStatus('Please select a CSV file.', 'error');
                     return;
@@ -162,15 +211,16 @@
                     try {
                         fullData = parseHDF(event.target.result);
                         if (fullData.length === 0) {
-                           setStatus('No valid data rows could be parsed. Check HDF file content.', 'error');
+                           setStatus('No valid data rows parsed. Check HDF file content.', 'error');
                            return;
                         }
                         setStatus('Running simulation...', 'loading');
                         setTimeout(() => {
-                            runAndDisplaySimulation();
+                            const params = getSimulationParameters();
+                            simulationResults = runSimulation(fullData, params);
+                            updateUI();
                             setStatus('Simulation complete!', 'success');
                         }, 50);
-
                     } catch (error) {
                         console.error('Error during processing:', error);
                         setStatus(`Error: ${error.message}`, 'error');
@@ -178,23 +228,11 @@
                 };
                 reader.onerror = () => setStatus('Failed to read the file.', 'error');
                 reader.readAsText(file);
-            });
-            
-            monthSelector.addEventListener('change', () => {
-                const selectedMonth = monthSelector.value;
-                updateMonthlyView(selectedMonth);
-            });
-
-            // --- Functions ---
-            function runAndDisplaySimulation() {
-                const params = getSimulationParameters();
-                simulationResults = runSimulation(fullData, params);
-                updateUI();
             }
 
             function setStatus(message, type = 'info') {
                 statusEl.textContent = message;
-                statusEl.classList.remove('text-red-500', 'text-green-500', 'text-gray-500', 'dark:text-gray-400');
+                statusEl.className = 'text-center mt-4 text-sm';
                 if (type === 'error') statusEl.classList.add('text-red-500');
                 if (type === 'success') statusEl.classList.add('text-green-500');
                 if (type === 'loading') statusEl.classList.add('text-gray-500', 'dark:text-gray-400');
@@ -202,8 +240,7 @@
 
             function parseHDF(csvText) {
                 const lines = csvText.trim().split('\n');
-                let headerIndex = -1;
-                let header;
+                let headerIndex = -1, header;
                 for (let i = 0; i < lines.length; i++) {
                     const lowerLine = lines[i].toLowerCase();
                     if (lowerLine.includes('read date') && lowerLine.includes('read type') && (lowerLine.includes('read value') || lowerLine.includes('read val'))) {
@@ -212,41 +249,34 @@
                         break;
                     }
                 }
-                if (headerIndex === -1) throw new Error('Could not find a valid header row in the HDF file.');
+                if (headerIndex === -1) throw new Error('Could not find a valid header row.');
 
                 const dateIndex = header.findIndex(h => h.toLowerCase().includes('read date and end time'));
                 const typeIndex = header.findIndex(h => h.toLowerCase().includes('read type'));
                 const valueIndex = header.findIndex(h => h.toLowerCase().includes('read value') || h.toLowerCase().includes('read val'));
-
-                if (dateIndex === -1 || typeIndex === -1 || valueIndex === -1) throw new Error(`HDF file is missing required columns. Found header: [${header.join(', ')}]`);
+                if (dateIndex === -1 || typeIndex === -1 || valueIndex === -1) throw new Error('HDF file is missing required columns.');
 
                 const dataMap = new Map();
                 for (let i = headerIndex + 1; i < lines.length; i++) {
-                    const line = lines[i];
-                    if (!line.trim()) continue;
-                    const values = line.split(',');
-                    if (values.length < Math.max(dateIndex, typeIndex, valueIndex) + 1) continue;
-                    const dateStr = values[dateIndex]?.trim().replace(/"/g, '');
-                    if (!dateStr) continue;
+                    if (!lines[i].trim()) continue;
+                    const values = lines[i].split(',');
+                    if (values.length <= Math.max(dateIndex, typeIndex, valueIndex)) continue;
                     
-                    const dateParts = dateStr.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})\s(\d{2}):(\d{2})/);
+                    const dateStr = values[dateIndex]?.trim().replace(/"/g, '');
+                    const dateParts = dateStr?.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})\s(\d{2}):(\d{2})/);
                     if (!dateParts) continue;
                     
                     const [, day, month, year, hour, minute] = dateParts;
                     const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
                     if (isNaN(originalTimestamp.getTime())) continue;
 
-                    // Group half-hourly data into hourly buckets.
                     const hourBucketTimestamp = new Date(originalTimestamp);
-                    // A reading at 13:00 is for the interval ending at 13:00 (i.e., 12:30-13:00).
-                    // This belongs to the 12:00-13:00 hour. So, subtract a microsecond to put it in the correct hour bucket.
-                    if (hourBucketTimestamp.getUTCMinutes() === 0 && hourBucketTimestamp.getUTCSeconds() === 0) {
+                    if (hourBucketTimestamp.getUTCMinutes() > 0 || hourBucketTimestamp.getUTCSeconds() > 0) {
                          hourBucketTimestamp.setTime(hourBucketTimestamp.getTime() - 1);
                     }
-                    hourBucketTimestamp.setUTCMinutes(0, 0, 0); // Set to the start of the hour.
+                    hourBucketTimestamp.setUTCMinutes(0, 0, 0);
                     
                     const key = hourBucketTimestamp.toISOString();
-
                     const readType = values[typeIndex]?.trim().replace(/"/g, '');
                     const readValue = parseFloat(values[valueIndex]);
                     if (!readType || isNaN(readValue)) continue;
@@ -258,128 +288,145 @@
                     else if (readType.toLowerCase().includes('active export')) entry.generation += readValue;
                 }
                 
-                if (dataMap.size === 0) throw new Error("No valid data rows were parsed. Check file content.");
+                if (dataMap.size === 0) throw new Error("No valid data rows were parsed.");
                 return Array.from(dataMap.values()).sort((a, b) => a.timestamp - b.timestamp);
             }
 
             function getSimulationParameters() {
-                const batterySize = parseFloat(document.getElementById('batterySize').value);
-                const usableCapacityPercent = parseFloat(document.getElementById('usableCapacity').value) / 100;
-                return {
-                    batteryCapacity: batterySize,
-                    usableCapacity: batterySize * usableCapacityPercent,
+                const params = {
+                    batteryCapacity: parseFloat(document.getElementById('batterySize').value),
+                    usableCapacity: parseFloat(document.getElementById('batterySize').value) * (parseFloat(document.getElementById('usableCapacity').value) / 100),
                     maxChargeRate: parseFloat(document.getElementById('chargeRate').value),
                     maxDischargeRate: parseFloat(document.getElementById('chargeRate').value),
                     roundtripEfficiency: parseFloat(document.getElementById('roundtripEfficiency').value) / 100,
-                    importPrice: parseFloat(document.getElementById('importPrice').value),
-                    exportPrice: parseFloat(document.getElementById('exportPrice').value),
                     systemCost: parseFloat(document.getElementById('systemCost').value),
+                    strategy: document.getElementById('strategySelector').value,
+                    importPrices: [],
+                    exportPrices: [],
                 };
+                
+                const tariffType = document.querySelector('input[name="tariffType"]:checked').value;
+                if (tariffType === 'flat') {
+                    const flatImport = parseFloat(document.getElementById('importPrice').value);
+                    const flatExport = parseFloat(document.getElementById('exportPrice').value);
+                    params.importPrices = Array(24).fill(flatImport);
+                    params.exportPrices = Array(24).fill(flatExport);
+                } else {
+                    for (let i = 0; i < 24; i++) {
+                        params.importPrices.push(parseFloat(document.getElementById(`import-rate-${i}`).value));
+                        params.exportPrices.push(parseFloat(document.getElementById(`export-rate-${i}`).value));
+                    }
+                }
+                return params;
             }
 
             function runSimulation(data, params) {
                 let batterySoC = 0;
                 const monthlyData = {};
                 
-                // Initialize monthly data buckets
                 data.forEach(row => {
                     const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`;
                     if (!monthlyData[monthKey]) {
-                        monthlyData[monthKey] = {
-                            importWithoutBattery: 0, importWithBattery: 0, exportWithBattery: 0,
-                            consumption: 0, generation: 0, chargedToBattery: 0, dischargedFromBattery: 0,
-                            savings: 0, costWithoutBattery: 0, costWithBattery: 0, exportRevenue: 0
-                        };
+                        monthlyData[monthKey] = { importWithoutBattery: 0, importWithBattery: 0, exportWithBattery: 0, consumption: 0, generation: 0, chargedToBattery: 0, dischargedFromBattery: 0 };
                     }
                 });
 
+                const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
 
                 for (const row of data) {
                     const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`;
                     const m = monthlyData[monthKey];
+                    const hour = row.timestamp.getUTCHours();
+                    const currentImportPrice = params.importPrices[hour];
+                    const currentExportPrice = params.exportPrices[hour];
                     
-                    const timeStepHours = 1.0; // Data is now hourly
-                    const maxChargePower = params.maxChargeRate * timeStepHours;
-                    const maxDischargePower = params.maxDischargeRate * timeStepHours;
-                    const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
-
+                    let netEnergy = row.generation - row.consumption;
                     m.consumption += row.consumption;
                     m.generation += row.generation;
-                    
-                    const netEnergy = row.generation - row.consumption;
                     m.importWithoutBattery += Math.max(0, -netEnergy);
+                    
+                    let gridImport = 0, gridExport = 0, chargeAmount = 0, dischargeAmount = 0;
 
-                    let importWithBattery = 0, exportWithBattery = 0, chargedToBattery = 0, dischargedFromBattery = 0;
-
-                    if (netEnergy > 0) {
-                        const chargeToAttempt = Math.min(netEnergy, params.usableCapacity - batterySoC, maxChargePower);
-                        if (chargeToAttempt > 0) {
-                            const energyFromSource = chargeToAttempt / efficiencySqrt;
-                            batterySoC += chargeToAttempt;
-                            chargedToBattery = chargeToAttempt;
-                            exportWithBattery = netEnergy - energyFromSource;
-                        } else {
-                            exportWithBattery = netEnergy;
+                    // --- STRATEGY LOGIC ---
+                    if (params.strategy === 'price-arbitrage') {
+                        // Charge from grid if price is low
+                        const avgImportPrice = params.importPrices.reduce((a, b) => a + b, 0) / 24;
+                        if (currentImportPrice < avgImportPrice * 0.8) { // Charge if price is 20% below average
+                             const potentialChargeFromGrid = params.maxChargeRate;
+                             const chargeFromGrid = Math.min(potentialChargeFromGrid, params.usableCapacity - batterySoC);
+                             if (chargeFromGrid > 0) {
+                                batterySoC += chargeFromGrid * efficiencySqrt;
+                                chargeAmount += chargeFromGrid;
+                                netEnergy -= chargeFromGrid; // This energy is now drawn from grid
+                             }
                         }
-                    } else {
-                        const deficit = -netEnergy;
-                        const dischargeToAttempt = Math.min(deficit, batterySoC, maxDischargePower);
-                        if (dischargeToAttempt > 0) {
-                            const energyDelivered = dischargeToAttempt * efficiencySqrt;
-                            batterySoC -= dischargeToAttempt;
-                            dischargedFromBattery = dischargeToAttempt;
-                            importWithBattery = deficit - energyDelivered;
-                        } else {
-                            importWithBattery = deficit;
+                        
+                        // Force discharge to grid if price is high
+                        const avgExportPrice = params.exportPrices.reduce((a, b) => a + b, 0) / 24;
+                        if (currentExportPrice > avgExportPrice * 1.2) { // Sell if price is 20% above average
+                            const potentialDischargeToGrid = Math.min(params.maxDischargeRate, batterySoC);
+                            if (potentialDischargeToGrid > 0) {
+                                batterySoC -= potentialDischargeToGrid;
+                                const energySold = potentialDischargeToGrid * efficiencySqrt;
+                                dischargeAmount += potentialDischargeToGrid;
+                                netEnergy += energySold; // Add to net, which becomes export
+                            }
                         }
                     }
-                    m.importWithBattery += importWithBattery;
-                    m.exportWithBattery += exportWithBattery;
-                    m.chargedToBattery += chargedToBattery;
-                    m.dischargedFromBattery += dischargedFromBattery;
+
+                    // --- CORE BATTERY LOGIC ---
+                    if (netEnergy > 0) { // Excess generation
+                        chargeAmount = Math.min(netEnergy, params.usableCapacity - batterySoC, params.maxChargeRate);
+                        batterySoC += chargeAmount;
+                        gridExport = netEnergy - chargeAmount;
+                    } else { // Energy deficit
+                        dischargeAmount = Math.min(-netEnergy, batterySoC, params.maxDischargeRate);
+                        batterySoC -= dischargeAmount;
+                        gridImport = -netEnergy - dischargeAmount;
+                    }
+                    
+                    m.importWithBattery += gridImport;
+                    m.exportWithBattery += gridExport;
+                    m.chargedToBattery += chargeAmount;
+                    m.dischargedFromBattery += dischargeAmount;
                 }
 
                 let totalImportWithoutBattery = 0, totalImportWithBattery = 0, totalExportWithBattery = 0, totalConsumption = 0;
+                let totalSavings = 0;
 
-                // Aggregate totals and calculate financials
                 Object.values(monthlyData).forEach(m => {
                     totalConsumption += m.consumption;
                     totalImportWithoutBattery += m.importWithoutBattery;
                     totalImportWithBattery += m.importWithBattery;
                     totalExportWithBattery += m.exportWithBattery;
                     
-                    m.costWithoutBattery = m.importWithoutBattery * params.importPrice;
-                    m.costWithBattery = m.importWithBattery * params.importPrice;
-                    m.exportRevenue = m.exportWithBattery * params.exportPrice;
-                    m.savings = m.costWithoutBattery - (m.costWithBattery - m.exportRevenue);
+                    const costWithoutBattery = m.importWithoutBattery * params.importPrices.reduce((a, b) => a + b) / 24; // Use average for this summary
+                    const costWithBattery = m.importWithBattery * params.importPrices.reduce((a, b) => a + b) / 24;
+                    const exportRevenue = m.exportWithBattery * params.exportPrices.reduce((a, b) => a + b) / 24;
+                    m.savings = costWithoutBattery - (costWithBattery - exportRevenue);
+                    totalSavings += m.savings;
                 });
-
-                const daysInData = data.length / 24; // data length is now number of hours
+                
+                const daysInData = data.length / 24;
                 const scalingFactor = daysInData > 0 ? 365 / daysInData : 1;
-
-                const annualSavings = (totalImportWithoutBattery - totalImportWithBattery) * params.importPrice * scalingFactor + (totalExportWithBattery * params.exportPrice * scalingFactor);
+                const annualSavings = totalSavings * scalingFactor;
                 const paybackPeriod = params.systemCost > 0 && annualSavings > 0 ? params.systemCost / annualSavings : Infinity;
                 const annualConsumption = totalConsumption * scalingFactor;
                 const annualImportWithBattery = totalImportWithBattery * scalingFactor;
                 const selfSufficiency = annualConsumption > 0 ? ((annualConsumption - annualImportWithBattery) / annualConsumption) * 100 : 0;
 
-                return {
-                    annualSavings, paybackPeriod, selfSufficiency, monthlyData
-                };
+                return { annualSavings, paybackPeriod, selfSufficiency, monthlyData };
             }
             
             function generateChartDataForMonth(dataForMonth, params) {
-                const intervalsInDay = 24; // Now 24 hours in a day
+                const intervalsInDay = 24;
                 let bestDayIndex = 0, maxVariance = 0;
                 
                 if (dataForMonth.length >= intervalsInDay) {
-                    for (let i = 0; i <= dataForMonth.length - intervalsInDay; i++) { // Step by 1 day (24 hours)
+                    for (let i = 0; i <= dataForMonth.length - intervalsInDay; i++) {
                         const dayDataSlice = dataForMonth.slice(i, i + intervalsInDay);
                         const variance = dayDataSlice.reduce((sum, r) => sum + Math.abs(r.generation - r.consumption), 0);
-                        if (variance > maxVariance) {
-                            maxVariance = variance;
-                            bestDayIndex = i;
-                        }
+                        if (variance > maxVariance) { maxVariance = variance; bestDayIndex = i; }
                     }
                 }
                 
@@ -388,7 +435,6 @@
                 
                 let batterySoC = 0;
                 const chartSeries = { labels: [], consumption: [], generation: [], batteryCharge: [], batteryDischarge: [], gridImport: [], gridExport: [] };
-                const timeStepHours = 1.0, maxChargePower = params.maxChargeRate * timeStepHours, maxDischargePower = params.maxDischargeRate * timeStepHours;
                 const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
                 
                 for (const row of dayData) {
@@ -396,33 +442,47 @@
                     chartSeries.consumption.push(row.consumption);
                     chartSeries.generation.push(row.generation);
 
-                    let gridImportVal = 0, gridExportVal = 0, batteryChargeVal = 0, batteryDischargeVal = 0;
-                    const netEnergy = row.generation - row.consumption;
-
-                    if (netEnergy > 0) {
-                        const chargeAttempt = Math.min(netEnergy, params.usableCapacity - batterySoC, maxChargePower);
-                        if (chargeAttempt > 0) {
-                            const energyFromSource = chargeAttempt / efficiencySqrt;
-                            batteryChargeVal = energyFromSource;
-                            batterySoC += chargeAttempt;
+                    let netEnergy = row.generation - row.consumption;
+                    let gridImport = 0, gridExport = 0, chargeAmount = 0, dischargeAmount = 0;
+                    
+                    if (params.strategy === 'price-arbitrage') {
+                        const hour = row.timestamp.getUTCHours();
+                        const avgImportPrice = params.importPrices.reduce((a, b) => a + b, 0) / 24;
+                         if (params.importPrices[hour] < avgImportPrice * 0.8) {
+                             const chargeFromGrid = Math.min(params.maxChargeRate, params.usableCapacity - batterySoC);
+                             if (chargeFromGrid > 0) {
+                                batterySoC += chargeFromGrid * efficiencySqrt;
+                                chargeAmount += chargeFromGrid;
+                                netEnergy -= chargeFromGrid;
+                             }
                         }
-                        gridExportVal = netEnergy - batteryChargeVal;
-                    } else {
-                        const deficit = -netEnergy;
-                        const dischargeAttempt = Math.min(deficit, batterySoC, maxDischargePower);
-                        if (dischargeAttempt > 0) {
-                            const energyDelivered = dischargeAttempt * efficiencySqrt;
-                            batteryDischargeVal = energyDelivered;
-                            batterySoC -= dischargeAttempt;
-                            gridImportVal = deficit - energyDelivered;
-                        } else {
-                            gridImportVal = deficit;
+                        const avgExportPrice = params.exportPrices.reduce((a, b) => a + b, 0) / 24;
+                        if (params.exportPrices[hour] > avgExportPrice * 1.2) {
+                            const dischargeToGrid = Math.min(params.maxDischargeRate, batterySoC);
+                            if (dischargeToGrid > 0) {
+                                batterySoC -= dischargeToGrid;
+                                dischargeAmount += dischargeToGrid;
+                                netEnergy += dischargeToGrid * efficiencySqrt;
+                            }
                         }
                     }
-                    chartSeries.batteryCharge.push(batteryChargeVal);
-                    chartSeries.batteryDischarge.push(batteryDischargeVal);
-                    chartSeries.gridImport.push(gridImportVal);
-                    chartSeries.gridExport.push(gridExportVal);
+
+                    if (netEnergy > 0) {
+                        const chargeFromSolar = Math.min(netEnergy, params.usableCapacity - batterySoC, params.maxChargeRate);
+                        batterySoC += chargeFromSolar;
+                        chargeAmount += chargeFromSolar;
+                        gridExport = netEnergy - chargeFromSolar;
+                    } else {
+                        const dischargeToHome = Math.min(-netEnergy, batterySoC, params.maxDischargeRate);
+                        batterySoC -= dischargeToHome;
+                        dischargeAmount += dischargeToHome;
+                        gridImport = -netEnergy - dischargeToHome;
+                    }
+
+                    chartSeries.batteryCharge.push(chargeAmount);
+                    chartSeries.batteryDischarge.push(dischargeAmount);
+                    chartSeries.gridImport.push(gridImport);
+                    chartSeries.gridExport.push(gridExport);
                 }
                 return chartSeries;
             }
@@ -448,6 +508,7 @@
                 });
                 
                 if (monthKeys.length > 0) {
+                    monthSelector.value = monthKeys[0];
                     updateMonthlyView(monthKeys[0]);
                 }
             }
@@ -471,7 +532,7 @@
                 document.getElementById('summaryMonth').textContent = monthName;
                 const summaryList = document.getElementById('monthlySummaryList');
                 const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value);
-                const formatKWh = (value) => `${value.toFixed(0)} kWh`;
+                const formatKWh = (value) => `${value.toFixed(1)} kWh`;
 
                 summaryList.innerHTML = `
                     <li class="flex justify-between"><span>Monthly Savings:</span><span class="font-mono font-bold">${formatCurrency(monthSummary.savings)}</span></li>
@@ -495,11 +556,11 @@
                         labels: chartData.labels,
                         datasets: [
                             { label: 'Consumption', data: chartData.consumption, type: 'line', borderColor: '#ef4444', backgroundColor: '#fecaca', borderWidth: 2.5, fill: false, tension: 0.4, yAxisID: 'y' },
-                            { label: 'Solar Generation', data: chartData.generation, backgroundColor: 'rgba(250, 204, 21, 0.6)', borderColor: 'rgba(250, 204, 21, 1)', borderWidth: 1, stack: 'source' },
-                            { label: 'Battery Discharge', data: chartData.batteryDischarge, backgroundColor: 'rgba(56, 189, 248, 0.6)', borderColor: 'rgba(56, 189, 248, 1)', borderWidth: 1, stack: 'source' },
-                            { label: 'Grid Import', data: chartData.gridImport, backgroundColor: 'rgba(244, 63, 94, 0.6)', borderColor: 'rgba(244, 63, 94, 1)', borderWidth: 1, stack: 'source' },
-                            { label: 'Battery Charge', data: chartData.batteryCharge.map(v => -v), backgroundColor: 'rgba(34, 197, 94, 0.6)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, stack: 'use' },
-                            { label: 'Grid Export', data: chartData.gridExport.map(v => -v), backgroundColor: 'rgba(168, 85, 247, 0.6)', borderColor: 'rgba(168, 85, 247, 1)', borderWidth: 1, stack: 'use' },
+                            { label: 'Solar Generation', data: chartData.generation, backgroundColor: 'rgba(250, 204, 21, 0.6)', stack: 'source' },
+                            { label: 'Battery Discharge', data: chartData.batteryDischarge, backgroundColor: 'rgba(56, 189, 248, 0.6)', stack: 'source' },
+                            { label: 'Grid Import', data: chartData.gridImport, backgroundColor: 'rgba(244, 63, 94, 0.6)', stack: 'source' },
+                            { label: 'Battery Charge', data: chartData.batteryCharge.map(v => -v), backgroundColor: 'rgba(34, 197, 94, 0.6)', stack: 'use' },
+                            { label: 'Grid Export', data: chartData.gridExport.map(v => -v), backgroundColor: 'rgba(168, 85, 247, 0.6)', stack: 'use' },
                         ]
                     },
                     options: {
@@ -511,13 +572,12 @@
                        },
                        scales: {
                            x: { stacked: true, title: { display: true, text: 'Time of Day' } },
-                           y: { stacked: false, beginAtZero: true, title: { display: true, text: 'Energy (kWh)' }, suggestedMax: chartData.consumption.length > 0 ? Math.max(...chartData.consumption) * 1.2 : 1 }
+                           y: { stacked: false, beginAtZero: true, title: { display: true, text: 'Energy (kWh)' }, }
                        },
                        interaction: { mode: 'index', intersect: false },
                     }
                 };
             }
-            lucide.createIcons();
         });
     </script>
 </body>
