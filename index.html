@@ -115,7 +115,6 @@
                     htmlEl.classList.remove('dark');
                 }
                 localStorage.setItem('theme', theme);
-                // After applying theme, if chart exists, re-render it with new colors
                 if (energyChart) {
                     const daySelector = document.getElementById('daySelector');
                     if (daySelector.value) {
@@ -172,77 +171,93 @@
                 reader.readAsText(file);
             }
             
-            function runSimulation(data, params) { 
-                let batterySoC = 0; 
-                const monthlyData = {}; 
-                const detailedLog = []; 
-                const efficiencySqrt = Math.sqrt(params.roundtripEfficiency); 
-                for (const row of data) { 
-                    const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`; 
-                    if (!monthlyData[monthKey]) { monthlyData[monthKey] = { costWithoutBattery: 0, costWithBattery: 0, exportRevenue: 0, savings: 0, importWithoutBattery: 0, importWithBattery: 0, exportWithBattery: 0, consumption: 0, generation: 0, chargedToBattery: 0, dischargedFromBattery: 0, }; } 
-                    const m = monthlyData[monthKey]; 
-                    const hour = row.timestamp.getUTCHours(); 
-                    const importPrice = params.importPrices[hour]; 
-                    const exportPrice = params.exportPrices[hour]; 
-                    let homeConsumption = row.consumption; 
-                    let solarGeneration = row.generation; 
-                    let gridImport = 0, gridExport = 0, toBattery = 0, fromBattery = 0; 
+            // CORRECTED: This function now contains the proper energy balance logic
+            function runSimulation(data, params) {
+                let batterySoC = 0;
+                const monthlyData = {};
+                const detailedLog = [];
+                const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
+
+                for (const row of data) {
+                    const monthKey = `${row.timestamp.getFullYear()}-${(row.timestamp.getMonth() + 1).toString().padStart(2, '0')}`;
+                    if (!monthlyData[monthKey]) {
+                        monthlyData[monthKey] = { costWithoutBattery: 0, costWithBattery: 0, exportRevenue: 0, savings: 0, importWithoutBattery: 0, importWithBattery: 0, exportWithBattery: 0, consumption: 0, generation: 0, chargedToBattery: 0, dischargedFromBattery: 0, };
+                    }
+                    const m = monthlyData[monthKey];
+                    const hour = row.timestamp.getUTCHours();
+                    const importPrice = params.importPrices[hour];
+                    const exportPrice = params.exportPrices[hour];
+
+                    let homeConsumption = row.consumption;
+                    let solarGeneration = row.generation;
+                    let gridImport = 0, gridExport = 0, toBattery = 0, fromBattery = 0;
+
+                    const costWithoutBattery_hourly = Math.max(0, homeConsumption - solarGeneration) * importPrice;
+                    m.costWithoutBattery += costWithoutBattery_hourly;
+
+                    let netEnergy = solarGeneration - homeConsumption;
                     
-                    const costWithoutBattery_hourly = Math.max(0, homeConsumption - solarGeneration) * importPrice; 
-                    m.costWithoutBattery += costWithoutBattery_hourly; 
+                    if (params.strategy === 'price-arbitrage') { /* Price arbitrage logic can be added here */ }
                     
-                    let netEnergy = solarGeneration - homeConsumption; 
-                    
-                    if (params.strategy === 'price-arbitrage') { /* Unchanged */ } 
-                    
-                    if (netEnergy > 0) { 
-                        const chargeFromSolar = Math.min(netEnergy, (params.usableCapacity - batterySoC) / efficiencySqrt, params.maxChargeRate); 
-                        batterySoC += chargeFromSolar * efficiencySqrt; 
-                        toBattery += chargeFromSolar; 
-                        gridExport = netEnergy - chargeFromSolar; 
-                    } else { 
-                        const dischargeToHome = Math.min(-netEnergy, batterySoC, params.maxDischargeRate); 
-                        batterySoC -= dischargeToHome; 
-                        fromBattery += dischargeToHome * efficiencySqrt; 
-                        gridImport = -netEnergy - dischargeToHome; 
-                    } 
-                    
-                    gridImport = Math.min(gridImport, params.mic); 
-                    gridExport = Math.min(gridExport, params.mec); 
-                    
-                    m.consumption += homeConsumption; 
-                    m.generation += solarGeneration; 
-                    m.importWithoutBattery += Math.max(0, homeConsumption - solarGeneration); 
-                    m.importWithBattery += gridImport; 
-                    m.exportWithBattery += gridExport; 
-                    m.chargedToBattery += toBattery; 
-                    m.dischargedFromBattery += fromBattery; 
-                    
-                    const costWithBattery_hourly = gridImport * importPrice; 
-                    const revenueWithBattery_hourly = gridExport * exportPrice; 
-                    m.costWithBattery += costWithBattery_hourly; 
-                    m.exportRevenue += revenueWithBattery_hourly; 
-                    
-                    detailedLog.push({ timestamp: row.timestamp, consumption: homeConsumption, generation: solarGeneration, gridImport: gridImport, gridExport: gridExport, batteryCharge: toBattery, batteryDischarge: fromBattery, batterySoC: batterySoC, costWithout: costWithoutBattery_hourly, costWith: costWithBattery_hourly - revenueWithBattery_hourly, }); 
-                } 
-                
-                let totalConsumption = 0, totalImportWithBattery = 0, totalSavings = 0, totalBillBefore = 0; 
-                Object.values(monthlyData).forEach(m => { 
-                    m.savings = m.costWithoutBattery - (m.costWithBattery - m.exportRevenue); 
-                    totalSavings += m.savings; 
-                    totalBillBefore += m.costWithoutBattery; 
-                    totalConsumption += m.consumption; 
-                    totalImportWithBattery += m.importWithBattery; 
-                }); 
-                
-                const daysInData = data.length / 24; 
-                const scalingFactor = daysInData > 0 ? 365 / daysInData : 1; 
-                const annualSavings = totalSavings * scalingFactor; 
-                const annualBillBefore = totalBillBefore * scalingFactor; 
-                const paybackPeriod = params.systemCost > 0 && annualSavings > 0 ? params.systemCost / annualSavings : Infinity; 
-                const selfSufficiency = totalConsumption > 0 ? (1 - ((totalImportWithBattery * scalingFactor) / (totalConsumption * scalingFactor))) * 100 : 0; 
-                
-                return { annualSavings, paybackPeriod, selfSufficiency, annualBillBefore, monthlyData, detailedLog }; 
+                    if (netEnergy > 0) { // Surplus generation
+                        // How much energy can we attempt to put into the battery?
+                        const chargeAttempt = Math.min(netEnergy, params.maxChargeRate);
+                        // How much actual space is left, accounting for charging efficiency?
+                        const availableSpace = params.usableCapacity - batterySoC;
+                        const maxChargeIntoBattery = availableSpace / efficiencySqrt;
+                        // The actual amount we charge is the minimum of these
+                        toBattery = Math.min(chargeAttempt, maxChargeIntoBattery);
+                        
+                        batterySoC += toBattery * efficiencySqrt;
+                        gridExport = netEnergy - toBattery;
+
+                    } else { // Energy deficit
+                        const deficit = -netEnergy;
+                        // How much can we draw from the battery?
+                        const dischargeAttempt = Math.min(deficit, batterySoC, params.maxDischargeRate);
+                        batterySoC -= dischargeAttempt;
+                        // The useful energy delivered is after discharge efficiency losses
+                        fromBattery = dischargeAttempt * efficiencySqrt;
+                        // The remaining deficit must be imported from the grid
+                        gridImport = deficit - fromBattery;
+                    }
+
+                    gridImport = Math.min(gridImport, params.mic);
+                    gridExport = Math.min(gridExport, params.mec);
+
+                    m.consumption += homeConsumption;
+                    m.generation += solarGeneration;
+                    m.importWithoutBattery += Math.max(0, homeConsumption - solarGeneration);
+                    m.importWithBattery += gridImport;
+                    m.exportWithBattery += gridExport;
+                    m.chargedToBattery += toBattery;
+                    m.dischargedFromBattery += fromBattery;
+
+                    const costWithBattery_hourly = gridImport * importPrice;
+                    const revenueWithBattery_hourly = gridExport * exportPrice;
+                    m.costWithBattery += costWithBattery_hourly;
+                    m.exportRevenue += revenueWithBattery_hourly;
+
+                    detailedLog.push({ timestamp: row.timestamp, consumption: homeConsumption, generation: solarGeneration, gridImport: gridImport, gridExport: gridExport, batteryCharge: toBattery, batteryDischarge: fromBattery, batterySoC: batterySoC, costWithout: costWithoutBattery_hourly, costWith: costWithBattery_hourly - revenueWithBattery_hourly, });
+                }
+
+                let totalConsumption = 0, totalImportWithBattery = 0, totalSavings = 0, totalBillBefore = 0;
+                Object.values(monthlyData).forEach(m => {
+                    m.savings = m.costWithoutBattery - (m.costWithBattery - m.exportRevenue);
+                    totalSavings += m.savings;
+                    totalBillBefore += m.costWithoutBattery;
+                    totalConsumption += m.consumption;
+                    totalImportWithBattery += m.importWithBattery;
+                });
+
+                const daysInData = data.length / 24;
+                const scalingFactor = daysInData > 0 ? 365 / daysInData : 1;
+                const annualSavings = totalSavings * scalingFactor;
+                const annualBillBefore = totalBillBefore * scalingFactor;
+                const paybackPeriod = params.systemCost > 0 && annualSavings > 0 ? params.systemCost / annualSavings : Infinity;
+                const selfSufficiency = totalConsumption > 0 ? (1 - ((totalImportWithBattery * scalingFactor) / (totalConsumption * scalingFactor))) * 100 : 0;
+
+                return { annualSavings, paybackPeriod, selfSufficiency, annualBillBefore, monthlyData, detailedLog };
             }
 
             // --- UI Update and Charting Functions ---
@@ -266,7 +281,7 @@
                 });
                 
                 if (monthKeys.length > 0) {
-                    monthSelector.value = monthKeys[monthKeys.length -1]; // Default to the last month
+                    monthSelector.value = monthKeys[monthKeys.length -1];
                     updateDaySelector(monthSelector.value);
                 }
             }
@@ -348,17 +363,7 @@
                     data: {
                         labels: chartData.labels,
                         datasets: [
-                             {
-                                label: 'Net Demand (Cons-Gen)',
-                                data: chartData.netDemand,
-                                type: 'line',
-                                borderColor: '#ef4444', 
-                                borderWidth: 2.5,
-                                pointRadius: 0,
-                                fill: false,
-                                tension: 0.4,
-                                order: 0
-                            },
+                             { label: 'Net Demand (Cons-Gen)', data: chartData.netDemand, type: 'line', borderColor: '#ef4444', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.4, order: 0 },
                             { label: 'Grid Import', data: chartData.gridImport, backgroundColor: '#f43f5e', stack: 'positive', order: 1 },
                             { label: 'Battery Discharge', data: chartData.batteryDischarge, backgroundColor: '#38bdf8', stack: 'positive', order: 2 },
                             { label: 'Battery Charge', data: chartData.batteryCharge, backgroundColor: '#22c55e', stack: 'negative', order: 3 },
@@ -371,12 +376,7 @@
                            tooltip: {
                                 mode: 'index', intersect: false,
                                 callbacks: { 
-                                     label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) { label += ': '; }
-                                        if (context.parsed.y !== null) { label += Math.abs(context.parsed.y).toFixed(2) + ' kWh'; }
-                                        return label;
-                                    }
+                                     label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += Math.abs(context.parsed.y).toFixed(2) + ' kWh'; } return label; }
                                 }
                            },
                            title: { display: false },
