@@ -397,7 +397,7 @@
             }
 
             function updateDaySelector(monthKey) { const daySelector = document.getElementById('daySelector'); daySelector.innerHTML = ''; const daysInMonth = simulationResults.detailedLog.filter(log => log.timestamp.toISOString().startsWith(monthKey)).map(log => log.timestamp.toISOString().slice(0, 10)); const uniqueDays = [...new Set(daysInMonth)].sort(); uniqueDays.forEach(dayStr => { const option = document.createElement('option'); option.value = dayStr; option.textContent = new Date(dayStr + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }); daySelector.appendChild(option); }); updateMonthlySummary(monthKey); if (uniqueDays.length > 0) { daySelector.value = uniqueDays[0]; updateDailyView(uniqueDays[0]); } }
-            function updateMonthlySummary(monthKey) { const monthSummary = simulationResults.monthlyData[monthKey]; if (!monthSummary) return; const [year, month] = monthKey.split('-'); const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' }); document.getElementById('summaryMonth').textContent = monthName; const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value); const formatKWh = (value) => `${value.toFixed(1)} kWh`; document.getElementById('monthlySummaryList').innerHTML = `<li class="flex justify-between"><span>Monthly Savings:</span><span class="font-mono font-bold">${formatCurrency(monthSummary.savings)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Total Consumption:</span><span class="font-mono">${formatKWh(monthSummary.consumption)}</span></li><li class="flex justify-between"><span>Total Generation:</span><span class="font-mono">${formatKWh(monthSummary.generation)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Import w/o Battery:</span><span class="font-mono">${formatKWh(simulationResults.monthlyData[monthKey].importWithoutBattery || 0)}</span></li><li class="flex justify-between"><span>Import w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithBattery)}</span></li><li class="flex justify-between"><span>Export w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.exportWithBattery)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Charged to Battery:</span><span class="font-mono">${formatKWh(monthSummary.chargedToBattery)}</span></li><li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>`; }
+            function updateMonthlySummary(monthKey) { const monthSummary = simulationResults.monthlyData[monthKey]; if (!monthSummary) return; const [year, month] = key.split('-'); const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' }); document.getElementById('summaryMonth').textContent = monthName; const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value); const formatKWh = (value) => `${value.toFixed(1)} kWh`; document.getElementById('monthlySummaryList').innerHTML = `<li class="flex justify-between"><span>Monthly Savings:</span><span class="font-mono font-bold">${formatCurrency(monthSummary.savings)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Total Consumption:</span><span class="font-mono">${formatKWh(monthSummary.consumption)}</span></li><li class="flex justify-between"><span>Total Generation:</span><span class="font-mono">${formatKWh(monthSummary.generation)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Import w/o Battery:</span><span class="font-mono">${formatKWh(simulationResults.monthlyData[monthKey].importWithoutBattery || 0)}</span></li><li class="flex justify-between"><span>Import w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithBattery)}</span></li><li class="flex justify-between"><span>Export w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.exportWithBattery)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Charged to Battery:</span><span class="font-mono">${formatKWh(monthSummary.chargedToBattery)}</span></li><li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>`; }
             function updateDailyView(dayStr) { 
                 if (!dayStr || !simulationResults.detailedLog) return; 
                 const params = getSimulationParameters();
@@ -405,10 +405,9 @@
                 if (dayData.length === 0) return; 
                 const chartDateEl = document.getElementById('chartDate'); chartDateEl.textContent = new Date(dayStr + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); 
                 
-                // *** NEW ***: Calculate the series for the new chart style
                 const chartSeries = { 
                     labels: dayData.map(d => d.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 
-                    baseNetKw: dayData.map(d => (d.consumption - d.generation) * 2), // *2 to convert kWh per half-hour to kW
+                    baseNetKw: dayData.map(d => (d.consumption - d.generation) * 2),
                     newNetImportKw: dayData.map(d => d.gridImport > 0 ? d.gridImport * 2 : null),
                     newNetExportKw: dayData.map(d => d.gridExport > 0 ? -d.gridExport * 2 : null),
                     batterySoC: dayData.map(d => (d.batterySoC / params.usableCapacity) * 100)
@@ -424,7 +423,6 @@
             }
             function navigateDay(direction) { const daySelector = document.getElementById('daySelector'); const currentIndex = daySelector.selectedIndex; const newIndex = currentIndex + direction; if (newIndex >= 0 && newIndex < daySelector.options.length) { daySelector.selectedIndex = newIndex; daySelector.dispatchEvent(new Event('change')); } }
             
-            // *** NEW ***: This function now builds the new, simplified chart
             function getChartConfig(chartData) {
                  const isDarkMode = document.documentElement.classList.contains('dark');
                  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
@@ -435,7 +433,7 @@
                  const exportColor = '#22c55e'; // Green
 
                  return {
-                    type: 'bar', // Base type is bar, but we will override with line and area types
+                    type: 'bar',
                     data: {
                         labels: chartData.labels,
                         datasets: [
@@ -443,24 +441,24 @@
                                 label: 'Grid Import (kW)',
                                 type: 'line',
                                 data: chartData.newNetImportKw,
-                                backgroundColor: importColor + '66', // 40% opacity
+                                backgroundColor: importColor + '66',
                                 borderColor: importColor,
                                 yAxisID: 'y',
                                 fill: true,
                                 pointRadius: 0,
-                                borderWidth: 1,
+                                borderWidth: 0, // Set to 0 to hide the line on top of the area
                                 tension: 0.4,
                             },
                              {
                                 label: 'Grid Export (kW)',
                                 type: 'line',
                                 data: chartData.newNetExportKw,
-                                backgroundColor: exportColor + '66', // 40% opacity
+                                backgroundColor: exportColor + '66',
                                 borderColor: exportColor,
                                 yAxisID: 'y',
                                 fill: true,
                                 pointRadius: 0,
-                                borderWidth: 1,
+                                borderWidth: 0, // Set to 0 to hide the line on top of the area
                                 tension: 0.4,
                             },
                             {
@@ -484,7 +482,7 @@
                                 pointRadius: 0,
                                 fill: false,
                                 tension: 0.4,
-                                yAxisID: 'y1' // Assign to the second y-axis
+                                yAxisID: 'y1'
                             }
                         ]
                     },
