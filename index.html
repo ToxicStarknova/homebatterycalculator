@@ -17,9 +17,8 @@
         body { font-family: 'Inter', sans-serif; }
         .input-group { @apply mb-4; }
         .input-label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
-        /* Change: Removed dark:text-white to fix visibility issues in dark mode */
         .input-field { @apply w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 focus:ring-indigo-500 focus:border-indigo-500; }
-        .dark .input-field { @apply text-white; } /* Ensure text is white on dark backgrounds */
+        .dark .input-field { @apply text-white; }
         .result-card { @apply bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md; }
         .result-title { @apply text-lg font-medium text-gray-500 dark:text-gray-400 flex items-center; }
         .result-value { @apply text-3xl font-bold text-gray-900 dark:text-white mt-1; }
@@ -29,7 +28,6 @@
         .tariff-table { @apply w-full text-sm text-left border-collapse; }
         .tariff-table th, .tariff-table td { @apply p-2 border-b border-gray-200 dark:border-gray-700; }
         .tariff-table th { @apply font-semibold bg-gray-50 dark:bg-gray-800; }
-        /* Change: Ensured rate input text color is visible in dark mode */
         .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white; }
         .tariff-table .force-cb-label { @apply flex items-center justify-center cursor-pointer; }
     </style>
@@ -57,7 +55,6 @@
                         <div class="input-group"><label for="roundtripEfficiency" class="input-label">Efficiency (%)</label><input type="number" id="roundtripEfficiency" class="input-field" value="90"></div>
                         <div class="input-group"><label for="mic" class="input-label">Max Import (kW)</label><input type="number" id="mic" class="input-field" value="16"></div>
                         <div class="input-group"><label for="mec" class="input-label">Max Export (kW)</label><input type="number" id="mec" class="input-field" value="4"></div>
-                        <!-- Change: Add Min/Max SoC inputs -->
                         <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10"></div>
                         <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100"></div>
                     </div>
@@ -69,8 +66,8 @@
                         </select>
                      </div>
                      <div id="strategy-descriptions" class="hidden">
-                        <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night. It does not consider electricity prices.</p></div>
-                        <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. This stored, cheap energy is then used to power the home. Any solar generation is immediately exported to the grid to maximize export revenue.</p></div>
+                        <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
+                        <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
                      </div>
                 </div>
 
@@ -100,7 +97,6 @@
                 <div id="beforeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"></div>
 
                 <h2 class="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-200">"After" Scenario Annual Summary</h2>
-                <!-- Change: Expanded "After" summary to a 2x3 grid -->
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
                     <div class="result-card"><h3 class="result-title"><i data-lucide="log-in" class="mr-2 h-5 w-5"></i>Annual Import</h3><p id="annualImportAfter" class="result-value">0 kWh</p></div>
                     <div class="result-card"><h3 class="result-title"><i data-lucide="log-out" class="mr-2 h-5 w-5"></i>Annual Export</h3><p id="annualExportAfter" class="result-value">0 kWh</p></div>
@@ -293,10 +289,9 @@
             }
 
             async function runSimulation(data, params) {
-                // Change: Set up min/max SoC limits in kWh based on user percentages of usable capacity
                 const minSoC_kWh = params.usableCapacity * (params.minSoc / 100);
                 const maxSoC_kWh = params.usableCapacity * (params.maxSoc / 100);
-                let batterySoC = minSoC_kWh; // Start at minimum SoC
+                let batterySoC = minSoC_kWh;
 
                 const monthlyData = {}; 
                 const detailedLog = [];
@@ -319,7 +314,6 @@
                     const hour = row.timestamp.getUTCHours();
                     
                     if (prevRow && row.timestamp.getUTCDate() !== prevRow.timestamp.getUTCDate()) {
-                        // Change: Check if battery reached 99% of the user-defined MAX SoC
                         if (forceChargeScheduledToday && dailyMaxSoC < (maxSoC_kWh * 0.99)) {
                             const prevMKey = prevRow.timestamp.toISOString().slice(0, 7);
                             if (monthlyData[prevMKey]) monthlyData[prevMKey].missedFullCharges++;
@@ -335,64 +329,71 @@
                     m.costWithoutBattery += energyImportWithoutBattery * params.importPrices[hour];
                     m.importWithoutBattery += energyImportWithoutBattery;
 
-                    // The amount of energy the battery can discharge, respecting its current SoC and min limit
-                    const availableEnergyInBattery = (batterySoC - minSoC_kWh) * efficiencySqrt;
+                    const availableEnergyInBattery = Math.max(0, (batterySoC - minSoC_kWh) * efficiencySqrt);
+                    const spaceInBattery = Math.max(0, (maxSoC_kWh - batterySoC) / efficiencySqrt);
 
-                    if (params.strategy === 'export-maximiser') {
-                        let remainingHomeDemand = homeConsumption;
-                        
-                        let dischargeForHome = Math.min(remainingHomeDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
-                        if (dischargeForHome > 0.001) {
-                            batterySoC -= dischargeForHome / efficiencySqrt;
-                            fromBattery += dischargeForHome / efficiencySqrt;
-                            remainingHomeDemand -= dischargeForHome;
-                        }
+                    // LOGIC REWRITE: Handle house load first, then force charge
+                    let remainingDemand = homeConsumption;
+                    
+                    // Step 1: House consumes solar generation first
+                    const selfConsumptionFromSolar = Math.min(remainingDemand, solarGeneration);
+                    remainingDemand -= selfConsumptionFromSolar;
+                    const excessSolar = solarGeneration - selfConsumptionFromSolar;
 
-                        let importForHome = remainingHomeDemand;
-                        let importForCharge = 0;
+                    // Step 2: House consumes from battery
+                    const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
+                    if (dischargeForHome > 0.001) {
+                        const energyDrawnFromBattery = dischargeForHome / efficiencySqrt;
+                        batterySoC -= energyDrawnFromBattery;
+                        fromBattery += energyDrawnFromBattery;
+                        remainingDemand -= dischargeForHome;
+                    }
 
-                        if (params.forceChargeHours[hour]) {
-                            forceChargeScheduledToday = true;
-                            const availableGridPowerForCharge = params.mic - (importForHome * 2);
-                            const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
-                            const energyToCharge = Math.max(0, chargePower * 0.5);
-                            
-                            // The amount of space left in the battery, respecting the max SoC limit
-                            const spaceInBattery = (maxSoC_kWh - batterySoC) / efficiencySqrt;
-                            importForCharge = Math.min(energyToCharge, spaceInBattery);
+                    // Step 3: Any remaining house demand must be imported
+                    gridImport += remainingDemand;
 
-                            if (importForCharge > 0.001) {
-                                batterySoC += importForCharge * efficiencySqrt;
-                                toBattery += importForCharge;
+                    // Step 4: Handle what to do with excess solar (charge battery or export)
+                    if (excessSolar > 0) {
+                        if (params.strategy === 'self-consumption') {
+                            const chargeFromSolar = Math.min(excessSolar, spaceInBattery, params.maxChargeRate * 0.5);
+                            if (chargeFromSolar > 0.001) {
+                                const energyStoredFromSolar = chargeFromSolar * efficiencySqrt;
+                                batterySoC += energyStoredFromSolar;
+                                toBattery += chargeFromSolar; // Energy taken from solar
+                                gridExport += excessSolar - chargeFromSolar;
+                            } else {
+                                gridExport += excessSolar;
                             }
-                        }
-                        
-                        gridImport = importForHome + importForCharge;
-                        gridExport = solarGeneration;
-
-                    } else { // Self-Consumption Strategy
-                        let netEnergy = solarGeneration - homeConsumption;
-                        if (netEnergy > 0) { // Excess generation
-                            const chargeAttemptPower = Math.min(netEnergy * 2, params.maxChargeRate);
-                            let energyToCharge = chargeAttemptPower * 0.5;
-                            const spaceInBattery = (maxSoC_kWh - batterySoC) / efficiencySqrt;
-                            energyToCharge = Math.max(0, Math.min(energyToCharge, spaceInBattery));
-                            
-                            toBattery = energyToCharge;
-                            batterySoC += toBattery * efficiencySqrt;
-                            gridExport = netEnergy - toBattery;
-                        } else { // Deficit
-                            let deficit = -netEnergy;
-                            let dischargeAttempt = Math.min(deficit, availableEnergyInBattery, params.maxDischargeRate * 0.5);
-                            
-                            batterySoC -= dischargeAttempt / efficiencySqrt;
-                            fromBattery = dischargeAttempt / efficiencySqrt;
-                            gridImport = deficit - dischargeAttempt;
+                        } else { // For export-maximiser, all excess solar is exported
+                            gridExport += excessSolar;
                         }
                     }
 
-                    if (gridExport * 2 > params.mec) gridExport = params.mec / 2;
+                    // Step 5: Handle Force Charging (as a separate action)
+                    if (params.strategy === 'export-maximiser' && params.forceChargeHours[hour]) {
+                        forceChargeScheduledToday = true;
+                        
+                        // Calculate grid capacity available for charging
+                        const homeImportPower = gridImport * 2; // Power already committed to the home
+                        const availableGridPowerForCharge = params.mic - homeImportPower;
 
+                        // How much can we charge? Limited by grid and battery's own rate
+                        const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
+                        let energyToCharge = Math.max(0, chargePower * 0.5);
+
+                        // Is there space in the battery?
+                        energyToCharge = Math.min(energyToCharge, spaceInBattery);
+                        
+                        if (energyToCharge > 0.001) {
+                            batterySoC += energyToCharge * efficiencySqrt;
+                            toBattery += energyToCharge;
+                            gridImport += energyToCharge; // Add this charge amount to the total grid import
+                        }
+                    }
+
+                    // Final check on physical limits (MEC)
+                    if (gridExport * 2 > params.mec) gridExport = params.mec / 2;
+                    
                     m.consumption += homeConsumption; m.generation += solarGeneration; m.importWithBattery += gridImport; m.exportWithBattery += gridExport;
                     m.chargedToBattery += toBattery; m.dischargedFromBattery += fromBattery;
                     m.costWithBattery += gridImport * params.importPrices[hour]; m.exportRevenue += gridExport * params.exportPrices[hour];
@@ -550,7 +551,6 @@
                     labels: dayData.map(d => d.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 
                     baseNetKw: dayData.map(d => (d.consumption - d.generation) * 2),
                     newNetFlowKw: dayData.map(d => (d.gridImport - d.gridExport) * 2),
-                    // Display SoC as a percentage of the total usable capacity
                     batterySoC: dayData.map(d => (d.batterySoC / params.usableCapacity) * 100)
                 }; 
                 
@@ -573,11 +573,10 @@
                 const isDarkMode = document.documentElement.classList.contains('dark');
                 const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
                 const labelColor = isDarkMode ? '#cbd5e1' : '#4b5563';
-                const baselineColor = isDarkMode ? '#a78bfa' : '#8b5cf6'; // Violet
-                const netFlowColor = '#ef4444'; // Red
-                const zeroLineColor = '#22c55e'; // Green
+                const baselineColor = isDarkMode ? '#a78bfa' : '#8b5cf6';
+                const netFlowColor = '#ef4444';
+                const zeroLineColor = '#22c55e';
 
-                // Change: Ensure Y-axis minimum is at least -2
                 const minPower = Math.min(...chartData.newNetFlowKw, ...chartData.baseNetKw);
                 const yMin = Math.min(-2, minPower);
 
@@ -606,8 +605,8 @@
                                 min: yMin,
                                 grid: { 
                                     color: (context) => {
-                                        if (context.tick.value === 0) return zeroLineColor; // Zero line color
-                                        return gridColor; // Other grid lines
+                                        if (context.tick.value === 0) return zeroLineColor;
+                                        return gridColor;
                                     },
                                     lineWidth: (context) => {
                                          if (context.tick.value === 0) return 2;
@@ -627,7 +626,7 @@
                 const isDarkMode = document.documentElement.classList.contains('dark');
                 const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
                 const labelColor = isDarkMode ? '#cbd5e1' : '#4b5563';
-                const socColor = isDarkMode ? '#60a5fa' : '#3b82f6'; // Blue
+                const socColor = isDarkMode ? '#60a5fa' : '#3b82f6';
 
                 return {
                     type: 'bar',
@@ -709,3 +708,4 @@
     </script>
 </body>
 </html>
+
