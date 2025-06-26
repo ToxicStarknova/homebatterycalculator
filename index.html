@@ -280,7 +280,7 @@
                 const exportIsHourly = document.querySelector('input[name="exportTariffType"]:checked').value === 'hourly';
                 
                 for (let i = 0; i < 24; i++) {
-                    params.importPrices[i] = importIsHourly ? parseFloat(document.getElementById(`import-rate-${i}`).value) : parseFloat(document.getElementById('importPrice').value);
+                    params.importPrices[i] = importIsHourly ? parseFloat(document.getElementById(`import-rate-${i}`).value) : parseFloat(document.getElementById('exportPrice').value);
                     params.exportPrices[i] = exportIsHourly ? parseFloat(document.getElementById(`export-rate-${i}`).value) : parseFloat(document.getElementById('exportPrice').value);
                     const importForce = document.getElementById(`import-force-charge-${i}`)?.checked;
                     params.forceChargeHours[i] = importForce;
@@ -288,6 +288,9 @@
                 return params;
             }
 
+            // =================================================================
+            // BUGFIX: Complete rewrite of the simulation engine
+            // =================================================================
             async function runSimulation(data, params) {
                 const minSoC_kWh = params.usableCapacity * (params.minSoc / 100);
                 const maxSoC_kWh = params.usableCapacity * (params.maxSoc / 100);
@@ -332,13 +335,13 @@
                     const availableEnergyInBattery = Math.max(0, (batterySoC - minSoC_kWh) * efficiencySqrt);
                     const spaceInBattery = Math.max(0, (maxSoC_kWh - batterySoC) / efficiencySqrt);
 
-                    // LOGIC REWRITE: Handle house load first, then force charge
                     let remainingDemand = homeConsumption;
-                    
+                    let excessSolar = solarGeneration;
+
                     // Step 1: House consumes solar generation first
-                    const selfConsumptionFromSolar = Math.min(remainingDemand, solarGeneration);
+                    const selfConsumptionFromSolar = Math.min(remainingDemand, excessSolar);
                     remainingDemand -= selfConsumptionFromSolar;
-                    const excessSolar = solarGeneration - selfConsumptionFromSolar;
+                    excessSolar -= selfConsumptionFromSolar;
 
                     // Step 2: House consumes from battery
                     const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
@@ -349,17 +352,17 @@
                         remainingDemand -= dischargeForHome;
                     }
 
-                    // Step 3: Any remaining house demand must be imported
-                    gridImport += remainingDemand;
+                    // Step 3: Any remaining house demand must be imported from the grid
+                    const importForHome = remainingDemand;
+                    gridImport += importForHome;
 
-                    // Step 4: Handle what to do with excess solar (charge battery or export)
+                    // Step 4: Handle excess solar (charge battery in self-consumption, otherwise export)
                     if (excessSolar > 0) {
                         if (params.strategy === 'self-consumption') {
                             const chargeFromSolar = Math.min(excessSolar, spaceInBattery, params.maxChargeRate * 0.5);
                             if (chargeFromSolar > 0.001) {
-                                const energyStoredFromSolar = chargeFromSolar * efficiencySqrt;
-                                batterySoC += energyStoredFromSolar;
-                                toBattery += chargeFromSolar; // Energy taken from solar
+                                batterySoC += chargeFromSolar * efficiencySqrt;
+                                toBattery += chargeFromSolar;
                                 gridExport += excessSolar - chargeFromSolar;
                             } else {
                                 gridExport += excessSolar;
@@ -369,34 +372,35 @@
                         }
                     }
 
-                    // Step 5: Handle Force Charging (as a separate action)
+                    // Step 5: Handle Force Charging from the grid
                     if (params.strategy === 'export-maximiser' && params.forceChargeHours[hour]) {
                         forceChargeScheduledToday = true;
                         
-                        // Calculate grid capacity available for charging
-                        const homeImportPower = gridImport * 2; // Power already committed to the home
+                        const homeImportPower = importForHome * 2;
                         const availableGridPowerForCharge = params.mic - homeImportPower;
 
-                        // How much can we charge? Limited by grid and battery's own rate
                         const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
                         let energyToCharge = Math.max(0, chargePower * 0.5);
-
-                        // Is there space in the battery?
+                        
                         energyToCharge = Math.min(energyToCharge, spaceInBattery);
                         
                         if (energyToCharge > 0.001) {
                             batterySoC += energyToCharge * efficiencySqrt;
                             toBattery += energyToCharge;
-                            gridImport += energyToCharge; // Add this charge amount to the total grid import
+                            gridImport += energyToCharge;
                         }
                     }
 
-                    // Final check on physical limits (MEC)
                     if (gridExport * 2 > params.mec) gridExport = params.mec / 2;
                     
-                    m.consumption += homeConsumption; m.generation += solarGeneration; m.importWithBattery += gridImport; m.exportWithBattery += gridExport;
-                    m.chargedToBattery += toBattery; m.dischargedFromBattery += fromBattery;
-                    m.costWithBattery += gridImport * params.importPrices[hour]; m.exportRevenue += gridExport * params.exportPrices[hour];
+                    m.consumption += homeConsumption; 
+                    m.generation += solarGeneration; 
+                    m.importWithBattery += gridImport; 
+                    m.exportWithBattery += gridExport;
+                    m.chargedToBattery += toBattery; 
+                    m.dischargedFromBattery += fromBattery;
+                    m.costWithBattery += gridImport * params.importPrices[hour]; 
+                    m.exportRevenue += gridExport * params.exportPrices[hour];
                     
                     detailedLog.push({ timestamp: row.timestamp, consumption: homeConsumption, generation: solarGeneration, gridImport, gridExport, batteryCharge: toBattery, batteryDischarge: fromBattery, batterySoC });
 
@@ -708,4 +712,5 @@
     </script>
 </body>
 </html>
+
 
