@@ -280,7 +280,7 @@
                 const exportIsHourly = document.querySelector('input[name="exportTariffType"]:checked').value === 'hourly';
                 
                 for (let i = 0; i < 24; i++) {
-                    params.importPrices[i] = importIsHourly ? parseFloat(document.getElementById(`import-rate-${i}`).value) : parseFloat(document.getElementById('exportPrice').value);
+                    params.importPrices[i] = importIsHourly ? parseFloat(document.getElementById(`import-rate-${i}`).value) : parseFloat(document.getElementById('importPrice').value);
                     params.exportPrices[i] = exportIsHourly ? parseFloat(document.getElementById(`export-rate-${i}`).value) : parseFloat(document.getElementById('exportPrice').value);
                     const importForce = document.getElementById(`import-force-charge-${i}`)?.checked;
                     params.forceChargeHours[i] = importForce;
@@ -343,13 +343,16 @@
                     remainingDemand -= selfConsumptionFromSolar;
                     excessSolar -= selfConsumptionFromSolar;
 
-                    // Step 2: House consumes from battery
-                    const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
-                    if (dischargeForHome > 0.001) {
-                        const energyDrawnFromBattery = dischargeForHome / efficiencySqrt;
-                        batterySoC -= energyDrawnFromBattery;
-                        fromBattery += energyDrawnFromBattery;
-                        remainingDemand -= dischargeForHome;
+                    // Step 2: House consumes from battery, UNLESS it's a force charge hour
+                    const isForceChargeHour = params.strategy === 'export-maximiser' && params.forceChargeHours[hour];
+                    if (!isForceChargeHour) {
+                        const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
+                        if (dischargeForHome > 0.001) {
+                            const energyDrawnFromBattery = dischargeForHome / efficiencySqrt;
+                            batterySoC -= energyDrawnFromBattery;
+                            fromBattery += energyDrawnFromBattery;
+                            remainingDemand -= dischargeForHome;
+                        }
                     }
 
                     // Step 3: Any remaining house demand must be imported from the grid
@@ -373,7 +376,7 @@
                     }
 
                     // Step 5: Handle Force Charging from the grid
-                    if (params.strategy === 'export-maximiser' && params.forceChargeHours[hour]) {
+                    if (isForceChargeHour) {
                         forceChargeScheduledToday = true;
                         
                         const homeImportPower = importForHome * 2;
@@ -712,5 +715,3 @@
     </script>
 </body>
 </html>
-
-
