@@ -67,7 +67,8 @@
                      </div>
                      <div id="strategy-descriptions" class="hidden">
                         <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
-                        <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
+                        <!-- Change: Updated description to include Force Discharge -->
+                        <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
                      </div>
                 </div>
 
@@ -288,9 +289,6 @@
                 return params;
             }
 
-            // =================================================================
-            // BUGFIX: Complete rewrite of the simulation engine
-            // =================================================================
             async function runSimulation(data, params) {
                 const minSoC_kWh = params.usableCapacity * (params.minSoc / 100);
                 const maxSoC_kWh = params.usableCapacity * (params.maxSoc / 100);
@@ -331,10 +329,11 @@
                     const energyImportWithoutBattery = Math.max(0, homeConsumption - solarGeneration);
                     m.costWithoutBattery += energyImportWithoutBattery * params.importPrices[hour];
                     m.importWithoutBattery += energyImportWithoutBattery;
-
-                    const availableEnergyInBattery = Math.max(0, (batterySoC - minSoC_kWh) * efficiencySqrt);
-                    const spaceInBattery = Math.max(0, (maxSoC_kWh - batterySoC) / efficiencySqrt);
-
+                    
+                    const availableEnergyInBattery = Math.max(0, (batterySoC - minSoC_kWh));
+                    const spaceInBattery = Math.max(0, (maxSoC_kWh - batterySoC));
+                    const isForceChargeHour = params.strategy === 'export-maximiser' && params.forceChargeHours[hour];
+                    
                     let remainingDemand = homeConsumption;
                     let excessSolar = solarGeneration;
 
@@ -343,10 +342,9 @@
                     remainingDemand -= selfConsumptionFromSolar;
                     excessSolar -= selfConsumptionFromSolar;
 
-                    // Step 2: House consumes from battery, UNLESS it's a force charge hour
-                    const isForceChargeHour = params.strategy === 'export-maximiser' && params.forceChargeHours[hour];
+                    // Step 2: House consumes from battery (unless preserving for force charge)
                     if (!isForceChargeHour) {
-                        const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery, params.maxDischargeRate * 0.5);
+                        const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
                         if (dischargeForHome > 0.001) {
                             const energyDrawnFromBattery = dischargeForHome / efficiencySqrt;
                             batterySoC -= energyDrawnFromBattery;
@@ -359,10 +357,10 @@
                     const importForHome = remainingDemand;
                     gridImport += importForHome;
 
-                    // Step 4: Handle excess solar (charge battery in self-consumption, otherwise export)
+                    // Step 4: Handle excess solar (charge battery or export)
                     if (excessSolar > 0) {
                         if (params.strategy === 'self-consumption') {
-                            const chargeFromSolar = Math.min(excessSolar, spaceInBattery, params.maxChargeRate * 0.5);
+                            const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * 0.5);
                             if (chargeFromSolar > 0.001) {
                                 batterySoC += chargeFromSolar * efficiencySqrt;
                                 toBattery += chargeFromSolar;
@@ -370,12 +368,29 @@
                             } else {
                                 gridExport += excessSolar;
                             }
-                        } else { // For export-maximiser, all excess solar is exported
+                        } else {
                             gridExport += excessSolar;
                         }
                     }
 
-                    // Step 5: Handle Force Charging from the grid
+                    // Step 5: Handle Force Discharge (Export Maximiser only)
+                    const nextHour = (hour + 1) % 24;
+                    const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && params.forceChargeHours[nextHour];
+                    if (isPreChargeHour) {
+                        const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
+                        const currentExportPower = gridExport * 2;
+                        const availableExportCapacity = params.mec - currentExportPower;
+                        const finalDischarge = Math.min(energyToDischarge, availableExportCapacity * 0.5);
+                        
+                        if (finalDischarge > 0.001) {
+                            const energyDrawn = finalDischarge / efficiencySqrt;
+                            batterySoC -= energyDrawn;
+                            fromBattery += energyDrawn;
+                            gridExport += finalDischarge;
+                        }
+                    }
+                    
+                    // Step 6: Handle Force Charging (Export Maximiser only)
                     if (isForceChargeHour) {
                         forceChargeScheduledToday = true;
                         
@@ -385,7 +400,7 @@
                         const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
                         let energyToCharge = Math.max(0, chargePower * 0.5);
                         
-                        energyToCharge = Math.min(energyToCharge, spaceInBattery);
+                        energyToCharge = Math.min(energyToCharge, spaceInBattery / efficiencySqrt);
                         
                         if (energyToCharge > 0.001) {
                             batterySoC += energyToCharge * efficiencySqrt;
