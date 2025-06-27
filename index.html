@@ -15,8 +15,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .input-group { @apply mb-4; }
-        .input-label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
+        .input-group { @apply mb-4 relative; } /* Added relative positioning for tooltips */
+        .input-label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center; } /* Flex for icon alignment */
         .input-field { @apply w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 focus:ring-indigo-500 focus:border-indigo-500; }
         .dark .input-field { @apply text-white; }
         .result-card { @apply bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md; }
@@ -30,6 +30,9 @@
         .tariff-table th { @apply font-semibold bg-gray-50 dark:bg-gray-800; }
         .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white; }
         .tariff-table .force-cb-label { @apply flex items-center justify-center cursor-pointer; }
+        /* ADDED: Tooltip styles */
+        .tooltip { @apply absolute z-10 hidden w-64 p-3 -mt-2 -ml-3 text-sm text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm dark:bg-gray-700; }
+        .tooltip-arrow { @apply absolute w-0 h-0 border-transparent border-t-gray-900 dark:border-t-gray-700; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
@@ -64,28 +67,58 @@
                 <div class="mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">2. System & Strategy</h3>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="input-group"><label for="batterySize" class="input-label">Battery Capacity (kWh)</label><input type="number" id="batterySize" class="input-field" value="10"></div>
-                        <div class="input-group"><label for="usableCapacity" class="input-label">Usable Capacity (%)</label><input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100"></div>
-                        <div class="input-group"><label for="chargeRate" class="input-label">Charge/Discharge (kW)</label><input type="number" id="chargeRate" class="input-field" value="5"></div>
-                        <div class="input-group"><label for="roundtripEfficiency" class="input-label">Efficiency (%)</label><input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100"></div>
-                        <div class="input-group"><label for="mic" class="input-label">Max Import (kW)</label><input type="number" id="mic" class="input-field" value="16"></div>
-                        <div class="input-group"><label for="mec" class="input-label">Max Export (kW)</label><input type="number" id="mec" class="input-field" value="4"></div>
-                        <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10" min="0" max="100"></div>
-                        <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100"></div>
+                        <div class="input-group">
+                            <label for="batterySize" class="input-label">Battery Capacity (kWh)</label>
+                            <input type="number" id="batterySize" class="input-field" value="10">
+                        </div>
+                        <div class="input-group">
+                            <label for="usableCapacity" class="input-label">Usable Capacity (%)<button class="info-button" data-tooltip-target="tooltip-usable-capacity"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100">
+                            <div id="tooltip-usable-capacity" role="tooltip" class="tooltip">The percentage of the total battery capacity you can actually use, as limited by the manufacturer to protect the battery.</div>
+                        </div>
+                        <div class="input-group">
+                            <label for="chargeRate" class="input-label">Charge/Discharge (kW)</label>
+                            <input type="number" id="chargeRate" class="input-field" value="5">
+                        </div>
+                        <div class="input-group">
+                            <label for="roundtripEfficiency" class="input-label">Efficiency (%)<button class="info-button" data-tooltip-target="tooltip-efficiency"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100">
+                             <div id="tooltip-efficiency" role="tooltip" class="tooltip">The round-trip efficiency. Energy is lost during both charging and discharging. 90% is a typical value.</div>
+                        </div>
+                        <div class="input-group">
+                            <label for="mic" class="input-label">Max Import (kW)<button class="info-button" data-tooltip-target="tooltip-mic"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="mic" class="input-field" value="16">
+                             <div id="tooltip-mic" role="tooltip" class="tooltip">Your home's maximum import capacity from the grid, set by your provider (e.g., 16kW for standard domestic).</div>
+                        </div>
+                        <div class="input-group">
+                            <label for="mec" class="input-label">Max Export (kW)<button class="info-button" data-tooltip-target="tooltip-mec"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="mec" class="input-field" value="4">
+                            <div id="tooltip-mec" role="tooltip" class="tooltip">Your home's maximum allowed export power to the grid. Often limited by the inverter or network operator (e.g., 4kW).</div>
+                        </div>
+                        <div class="input-group">
+                            <label for="minSoc" class="input-label">Min SoC (%)<button class="info-button" data-tooltip-target="tooltip-min-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="minSoc" class="input-field" value="10" min="0" max="100">
+                            <div id="tooltip-min-soc" role="tooltip" class="tooltip">The minimum charge level you want to keep in the battery for backup or to prolong its life.</div>
+                        </div>
+                        <div class="input-group">
+                            <label for="maxSoc" class="input-label">Max SoC (%)<button class="info-button" data-tooltip-target="tooltip-max-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100">
+                            <div id="tooltip-max-soc" role="tooltip" class="tooltip">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
+                        </div>
                     </div>
                      <hr class="my-6 border-gray-200 dark:border-gray-700">
                      <div class="input-group">
-                        <label for="strategySelector" class="input-label flex items-center">Simulation Selection<button type="button" id="strategy-info-btn" aria-label="Strategy Information" class="info-button"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                        <label for="strategySelector" class="input-label">Simulation Selection<button id="strategy-info-btn" class="info-button" data-tooltip-target="tooltip-strategy"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                         <select id="strategySelector" class="input-field">
                             <option value="self-consumption">Self-Consumption</option>
                             <option value="export-maximiser" selected>Export Maximiser</option>
                         </select>
+                         <div id="tooltip-strategy" role="tooltip" class="tooltip">Choose how the battery should operate. 'Self-Consumption' prioritises using your own solar. 'Export Maximiser' uses smart tariffs to charge from the grid.</div>
                     </div>
                     <div id="strategy-descriptions">
                         <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
                         <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
                     </div>
-                    <!-- ADDED: Warning message for force-charging -->
                     <p id="force-charge-warning" class="text-red-500 dark:text-red-400 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                 </div>
 
@@ -166,6 +199,11 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const HOURS_PER_INTERVAL = 0.5;
+            const INTERVALS_PER_DAY = 24 / HOURS_PER_INTERVAL;
+            const DAYS_IN_YEAR = 365;
+            const FLOAT_TOLERANCE = 0.001;
+
             let fullData = [], simulationResults = {}, energyChart = null, socChart = null, monthlyConsumptionChart = null, isSimulating = false;
 
             const themeToggleBtn = document.getElementById('theme-toggle');
@@ -225,23 +263,55 @@
                         importHourlyRadio.checked = true;
                         importHourlyRadio.dispatchEvent(new Event('change'));
                     }
-                    // Show the warning message
                     forceChargeWarning.classList.remove('hidden');
                 } else {
-                    // Hide the warning message
                     forceChargeWarning.classList.add('hidden');
                 }
             }
 
             function displayStrategyDescription() {
+                const tooltip = document.getElementById('tooltip-strategy');
                 const strategy = strategySelector.value;
                 document.querySelectorAll('.strategy-description').forEach(el => el.classList.add('hidden'));
-                document.getElementById(`desc-${strategy}`).classList.remove('hidden');
+                const descEl = document.getElementById(`desc-${strategy}`);
+                if (descEl) {
+                    descEl.classList.remove('hidden');
+                    if(tooltip) tooltip.classList.add('hidden'); // Hide tooltip when main description is shown
+                }
             }
             
             strategyInfoBtn.addEventListener('click', () => { 
                 strategyDescriptions.classList.toggle('hidden'); 
             });
+
+            document.querySelectorAll('[data-tooltip-target]').forEach(button => {
+                const tooltipId = button.getAttribute('data-tooltip-target');
+                const tooltip = document.getElementById(tooltipId);
+                if (tooltip) {
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent the document click from firing immediately
+                        tooltip.classList.toggle('hidden');
+                    });
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                 let clickedOnInfoButton = e.target.closest('.info-button');
+                 
+                 // Hide all tooltips if the click is not on an info button
+                 if (!clickedOnInfoButton) {
+                    document.querySelectorAll('.tooltip').forEach(tooltip => {
+                        tooltip.classList.add('hidden');
+                    });
+                 }
+                 
+                 // Special handling for strategy description
+                 let clickedOnStrategyButton = e.target.closest('#strategy-info-btn');
+                 if (!clickedOnStrategyButton && e.target.id !== 'strategySelector' && !strategyDescriptions.contains(e.target)) {
+                    strategyDescriptions.classList.add('hidden');
+                 }
+            });
+
 
             strategySelector.addEventListener('change', () => {
                 updateFinancialsUI();
@@ -257,7 +327,6 @@
                 });
             });
             
-            displayStrategyDescription();
             updateFinancialsUI();
             document.getElementById('importTariffHourly').dispatchEvent(new Event('change'));
             document.getElementById('exportTariffFlat').dispatchEvent(new Event('change'));
@@ -277,7 +346,6 @@
                 
                 const params = getSimulationParameters();
                 
-                // ADDED: Pre-simulation check for force charge times
                 if (params.strategy === 'export-maximiser' && !params.forceChargeHours.some(h => h === true)) {
                     setStatus('Error: Please select at least one force charge hour for the Export Maximiser strategy.', 'error');
                     return;
@@ -395,8 +463,8 @@
                     excessSolar -= selfConsumptionFromSolar;
 
                     if (!isForceChargeHour) {
-                        const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
-                        if (dischargeForHome > 0.001) {
+                        const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * HOURS_PER_INTERVAL);
+                        if (dischargeForHome > FLOAT_TOLERANCE) {
                             const energyDrawnFromBattery = dischargeForHome / efficiencySqrt;
                             batterySoC -= energyDrawnFromBattery;
                             fromBattery += energyDrawnFromBattery;
@@ -409,8 +477,8 @@
 
                     if (excessSolar > 0) {
                         if (params.strategy === 'self-consumption') {
-                            const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * 0.5);
-                            if (chargeFromSolar > 0.001) {
+                            const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * HOURS_PER_INTERVAL);
+                            if (chargeFromSolar > FLOAT_TOLERANCE) {
                                 batterySoC += chargeFromSolar * efficiencySqrt;
                                 toBattery += chargeFromSolar;
                                 gridExport += excessSolar - chargeFromSolar;
@@ -427,12 +495,12 @@
                     const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && (params.forceChargeHours[nextHour] || params.forceChargeHours[hourAfterNext]);
                     
                     if (isPreChargeHour) {
-                        const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
-                        const currentExportPower = gridExport * 2;
+                        const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * HOURS_PER_INTERVAL);
+                        const currentExportPower = gridExport / HOURS_PER_INTERVAL;
                         const availableExportCapacity = params.mec - currentExportPower;
-                        const finalDischarge = Math.min(energyToDischarge, availableExportCapacity * 0.5);
+                        const finalDischarge = Math.min(energyToDischarge, availableExportCapacity * HOURS_PER_INTERVAL);
                         
-                        if (finalDischarge > 0.001) {
+                        if (finalDischarge > FLOAT_TOLERANCE) {
                             const energyDrawn = finalDischarge / efficiencySqrt;
                             batterySoC -= energyDrawn;
                             fromBattery += energyDrawn;
@@ -443,22 +511,22 @@
                     if (isForceChargeHour) {
                         forceChargeScheduledToday = true;
                         
-                        const homeImportPower = importForHome * 2;
+                        const homeImportPower = importForHome / HOURS_PER_INTERVAL;
                         const availableGridPowerForCharge = params.mic - homeImportPower;
 
                         const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
-                        let energyToCharge = Math.max(0, chargePower * 0.5);
+                        let energyToCharge = Math.max(0, chargePower * HOURS_PER_INTERVAL);
                         
                         energyToCharge = Math.min(energyToCharge, spaceInBattery / efficiencySqrt);
                         
-                        if (energyToCharge > 0.001) {
+                        if (energyToCharge > FLOAT_TOLERANCE) {
                             batterySoC += energyToCharge * efficiencySqrt;
                             toBattery += energyToCharge;
                             gridImport += energyToCharge;
                         }
                     }
 
-                    if (gridExport * 2 > params.mec) gridExport = params.mec / 2;
+                    if (gridExport / HOURS_PER_INTERVAL > params.mec) gridExport = params.mec * HOURS_PER_INTERVAL;
                     
                     m.consumption += homeConsumption; 
                     m.generation += solarGeneration; 
@@ -487,8 +555,8 @@
                     totalExportWithBattery += m.exportWithBattery;
                 });
                 
-                const daysInData = data.length / 48; 
-                const scalingFactor = daysInData > 0 ? 365 / daysInData : 1;
+                const daysInData = data.length / INTERVALS_PER_DAY; 
+                const scalingFactor = daysInData > 0 ? DAYS_IN_YEAR / daysInData : 1;
                 return { 
                     annualSavings: totalSavings * scalingFactor, 
                     paybackPeriod: (params.systemCost > 0 && totalSavings * scalingFactor > 0 ? params.systemCost / (totalSavings * scalingFactor) : Infinity), 
@@ -542,8 +610,8 @@
                     totalBill += imp * params.importPrices[hour];
                 });
 
-                const daysInData = fullData.length / 48;
-                const scalingFactor = daysInData > 0 ? 365 / daysInData : 1;
+                const daysInData = fullData.length / INTERVALS_PER_DAY;
+                const scalingFactor = daysInData > 0 ? DAYS_IN_YEAR / daysInData : 1;
 
                 const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value);
                 const formatKWhAnnual = (value) => `${(value * scalingFactor).toFixed(0)} kWh`;
@@ -620,8 +688,8 @@
                 
                 const chartSeries = { 
                     labels: dayData.map(d => d.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 
-                    baseNetKw: dayData.map(d => (d.consumption - d.generation) * 2),
-                    newNetFlowKw: dayData.map(d => (d.gridImport - d.gridExport) * 2),
+                    baseNetKw: dayData.map(d => (d.consumption - d.generation) / HOURS_PER_INTERVAL),
+                    newNetFlowKw: dayData.map(d => (d.gridImport - d.gridExport) / HOURS_PER_INTERVAL),
                     batterySoC: dayData.map(d => (d.batterySoC / params.usableCapacity) * 100)
                 }; 
                 
@@ -779,4 +847,3 @@
     </script>
 </body>
 </html>
-
