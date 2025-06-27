@@ -45,12 +45,11 @@
             <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg self-start sticky top-8">
                 <h2 class="text-2xl font-semibold mb-4 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
                 
-                <!-- MOVED: Run Simulation button is now at the top for easy access -->
                 <button id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
                 <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400"></p>
 
                 <!-- Section 1: HDF Upload -->
-                <div class="mb-6">
+                <div class="pt-4 mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">1. Upload HDF File</h3>
                     <div class="input-group">
                         <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
@@ -59,7 +58,6 @@
                     </div>
                 </div>
 
-                <!-- ADDED: Divider line -->
                 <hr class="my-6 border-gray-200 dark:border-gray-700">
 
                 <!-- Section 2: System & Strategy -->
@@ -75,8 +73,11 @@
                         <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10" min="0" max="100"></div>
                         <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100"></div>
                     </div>
+                    <!-- ADDED: Divider line -->
+                     <hr class="my-6 border-gray-200 dark:border-gray-700">
                      <div class="input-group">
-                        <label for="strategySelector" class="input-label flex items-center">Battery Strategy<button type="button" id="strategy-info-btn" aria-label="Strategy Information" class="info-button"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                        <!-- CHANGED: Label text -->
+                        <label for="strategySelector" class="input-label flex items-center">Simulation Selection<button type="button" id="strategy-info-btn" aria-label="Strategy Information" class="info-button"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                         <select id="strategySelector" class="input-field">
                             <option value="self-consumption">Self-Consumption</option>
                             <option value="export-maximiser" selected>Export Maximiser</option>
@@ -88,23 +89,43 @@
                     </div>
                 </div>
 
-                <!-- ADDED: Divider line -->
                 <hr class="my-6 border-gray-200 dark:border-gray-700">
 
                 <!-- Section 3: Financials -->
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
+                     <!-- MOVED & REPHRASED: VAT notice -->
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Ensure all costs and unit prices include VAT.</p>
                       <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
-                      <p class="text-xs text-gray-500 dark:text-gray-400 -mt-3 mb-3">Unit prices should include VAT.</p>
                       <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
                           <h4 class="font-semibold mb-2">Import Tariff</h4>
-                          <div class="flex items-center space-x-4 mb-4"><input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
+                          <!-- CHANGED: Layout for radio buttons -->
+                           <div class="grid grid-cols-2 gap-4 mb-4">
+                               <label for="importTariffFlat" class="flex items-center cursor-pointer">
+                                   <input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                   <span class="ml-2 block text-sm">Flat Rate</span>
+                               </label>
+                               <label for="importTariffHourly" class="flex items-center cursor-pointer">
+                                   <input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                   <span class="ml-2 block text-sm">Hourly</span>
+                                </label>
+                           </div>
                           <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
                           <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
                       </div>
                        <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
                           <h4 class="font-semibold mb-2">Export Tariff</h4>
-                          <div class="flex items-center space-x-4 mb-4"><input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
+                          <!-- CHANGED: Layout for radio buttons -->
+                           <div class="grid grid-cols-2 gap-4 mb-4">
+                                <label for="exportTariffFlat" class="flex items-center cursor-pointer">
+                                   <input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                   <span class="ml-2 block text-sm">Flat Rate</span>
+                                </label>
+                                <label for="exportTariffHourly" class="flex items-center cursor-pointer">
+                                   <input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                   <span class="ml-2 block text-sm">Hourly</span>
+                                </label>
+                           </div>
                           <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
                           <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
                       </div>
@@ -167,6 +188,7 @@
             
             function createHourlyRateInputs() {
                 const createTable = (type, defaultValue) => {
+                    // CHANGED: Added text-center to the Rate th
                     let tableHTML = `<table class="tariff-table"><thead><tr>
                         <th>Time</th>
                         <th class="text-center">Rate</th>
@@ -220,8 +242,6 @@
             strategySelector.addEventListener('change', () => {
                 updateFinancialsUI();
                 displayStrategyDescription();
-                // If the main description container is hidden, a change in selector shouldn't make it appear.
-                // The user can toggle it with the info button when they want.
             });
             
             document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
@@ -233,8 +253,7 @@
                 });
             });
             
-            // Initial UI setup
-            displayStrategyDescription(); // Show description for default selected strategy
+            displayStrategyDescription();
             updateFinancialsUI();
             document.getElementById('importTariffHourly').dispatchEvent(new Event('change'));
             document.getElementById('exportTariffFlat').dispatchEvent(new Event('change'));
@@ -357,12 +376,10 @@
                     let remainingDemand = homeConsumption;
                     let excessSolar = solarGeneration;
 
-                    // Step 1: House consumes solar generation first
                     const selfConsumptionFromSolar = Math.min(remainingDemand, excessSolar);
                     remainingDemand -= selfConsumptionFromSolar;
                     excessSolar -= selfConsumptionFromSolar;
 
-                    // Step 2: House consumes from battery (unless preserving for force charge)
                     if (!isForceChargeHour) {
                         const dischargeForHome = Math.min(remainingDemand, availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
                         if (dischargeForHome > 0.001) {
@@ -373,11 +390,9 @@
                         }
                     }
 
-                    // Step 3: Any remaining house demand must be imported from the grid
                     const importForHome = remainingDemand;
                     gridImport += importForHome;
 
-                    // Step 4: Handle excess solar (charge battery or export)
                     if (excessSolar > 0) {
                         if (params.strategy === 'self-consumption') {
                             const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * 0.5);
@@ -393,7 +408,6 @@
                         }
                     }
 
-                    // Step 5: Handle Force Discharge (Export Maximiser only)
                     const nextHour = (hour + 1) % 24;
                     const hourAfterNext = (hour + 2) % 24;
                     const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && (params.forceChargeHours[nextHour] || params.forceChargeHours[hourAfterNext]);
@@ -412,7 +426,6 @@
                         }
                     }
                     
-                    // Step 6: Handle Force Charging (Export Maximiser only)
                     if (isForceChargeHour) {
                         forceChargeScheduledToday = true;
                         
@@ -752,3 +765,4 @@
     </script>
 </body>
 </html>
+
