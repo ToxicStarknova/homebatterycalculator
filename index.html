@@ -85,6 +85,8 @@
                         <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
                         <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
                     </div>
+                    <!-- ADDED: Warning message for force-charging -->
+                    <p id="force-charge-warning" class="text-red-500 dark:text-red-400 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                 </div>
 
                 <hr class="my-6 border-gray-200 dark:border-gray-700">
@@ -183,7 +185,6 @@
             
             function createHourlyRateInputs() {
                 const createTable = (type, defaultValue) => {
-                    // ADDED: Right border to the Time header for separation
                     let tableHTML = `<table class="tariff-table"><thead><tr>
                         <th class="border-r border-gray-200 dark:border-gray-700">Time</th>
                         <th class="text-center">Rate</th>
@@ -192,7 +193,6 @@
 
                     for (let i = 0; i < 24; i++) {
                         const hour = i.toString().padStart(2, '0');
-                        // ADDED: Right border to the time cell for separation
                         tableHTML += `<tr>
                             <td class="border-r border-gray-200 dark:border-gray-700">${hour}:00-${hour}:59</td>
                             <td class="text-center"><input type="number" id="${type}-rate-${i}" class="input-field rate-input" value="${defaultValue}" step="0.01"></td>
@@ -213,15 +213,23 @@
             const strategySelector = document.getElementById('strategySelector');
             const strategyInfoBtn = document.getElementById('strategy-info-btn');
             const strategyDescriptions = document.getElementById('strategy-descriptions');
+            const forceChargeWarning = document.getElementById('force-charge-warning');
 
             function updateFinancialsUI() {
                 const strategy = strategySelector.value;
                 document.querySelectorAll('.force-control-col').forEach(c => c.classList.toggle('hidden', strategy !== 'export-maximiser'));
                 
                 const importHourlyRadio = document.getElementById('importTariffHourly');
-                if (strategy === 'export-maximiser' && !importHourlyRadio.checked) {
-                    importHourlyRadio.checked = true;
-                    importHourlyRadio.dispatchEvent(new Event('change'));
+                if (strategy === 'export-maximiser') {
+                    if (!importHourlyRadio.checked) {
+                        importHourlyRadio.checked = true;
+                        importHourlyRadio.dispatchEvent(new Event('change'));
+                    }
+                    // Show the warning message
+                    forceChargeWarning.classList.remove('hidden');
+                } else {
+                    // Hide the warning message
+                    forceChargeWarning.classList.add('hidden');
                 }
             }
 
@@ -265,8 +273,19 @@
             const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 
             async function runFullSimulation() {
-                if (isSimulating) return; isSimulating = true;
+                if (isSimulating) return;
+                
+                const params = getSimulationParameters();
+                
+                // ADDED: Pre-simulation check for force charge times
+                if (params.strategy === 'export-maximiser' && !params.forceChargeHours.some(h => h === true)) {
+                    setStatus('Error: Please select at least one force charge hour for the Export Maximiser strategy.', 'error');
+                    return;
+                }
+
+                isSimulating = true;
                 document.getElementById('calculateBtn').disabled = true;
+
                 try {
                     const file = document.getElementById('csvFile').files[0];
                     if (!file) throw new Error('Please select a CSV file.');
@@ -282,7 +301,6 @@
                     if (uniqueMonths < 12) setStatus(`Warning: Only ${uniqueMonths} full months found. Annual figures are an extrapolation.`, 'warning');
                     else setStatus('Running simulation...', 'loading');
                     await yieldToBrowser();
-                    const params = getSimulationParameters();
                     simulationResults = await runSimulation(fullData, params);
                     updateUI();
                     setStatus('Simulation complete!', 'success');
@@ -761,3 +779,4 @@
     </script>
 </body>
 </html>
+
