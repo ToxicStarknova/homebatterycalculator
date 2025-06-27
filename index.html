@@ -73,10 +73,8 @@
                         <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10" min="0" max="100"></div>
                         <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100"></div>
                     </div>
-                    <!-- ADDED: Divider line -->
                      <hr class="my-6 border-gray-200 dark:border-gray-700">
                      <div class="input-group">
-                        <!-- CHANGED: Label text -->
                         <label for="strategySelector" class="input-label flex items-center">Simulation Selection<button type="button" id="strategy-info-btn" aria-label="Strategy Information" class="info-button"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                         <select id="strategySelector" class="input-field">
                             <option value="self-consumption">Self-Consumption</option>
@@ -94,12 +92,10 @@
                 <!-- Section 3: Financials -->
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
-                     <!-- MOVED & REPHRASED: VAT notice -->
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Ensure all costs and unit prices include VAT.</p>
                       <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
                       <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
                           <h4 class="font-semibold mb-2">Import Tariff</h4>
-                          <!-- CHANGED: Layout for radio buttons -->
                            <div class="grid grid-cols-2 gap-4 mb-4">
                                <label for="importTariffFlat" class="flex items-center cursor-pointer">
                                    <input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
@@ -115,7 +111,6 @@
                       </div>
                        <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
                           <h4 class="font-semibold mb-2">Export Tariff</h4>
-                          <!-- CHANGED: Layout for radio buttons -->
                            <div class="grid grid-cols-2 gap-4 mb-4">
                                 <label for="exportTariffFlat" class="flex items-center cursor-pointer">
                                    <input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
@@ -188,17 +183,18 @@
             
             function createHourlyRateInputs() {
                 const createTable = (type, defaultValue) => {
-                    // CHANGED: Added text-center to the Rate th
+                    // ADDED: Right border to the Time header for separation
                     let tableHTML = `<table class="tariff-table"><thead><tr>
-                        <th>Time</th>
+                        <th class="border-r border-gray-200 dark:border-gray-700">Time</th>
                         <th class="text-center">Rate</th>
                         <th class="force-control-col hidden text-center" title="Force Charge"><i data-lucide="zap" class="h-4 w-4 inline-block"></i></th>
                     </tr></thead><tbody>`;
 
                     for (let i = 0; i < 24; i++) {
                         const hour = i.toString().padStart(2, '0');
+                        // ADDED: Right border to the time cell for separation
                         tableHTML += `<tr>
-                            <td>${hour}:00-${hour}:59</td>
+                            <td class="border-r border-gray-200 dark:border-gray-700">${hour}:00-${hour}:59</td>
                             <td class="text-center"><input type="number" id="${type}-rate-${i}" class="input-field rate-input" value="${defaultValue}" step="0.01"></td>
                             <td class="force-control-col hidden text-center">
                                 <label class="force-cb-label"><input type="checkbox" id="${type}-force-charge-${i}" class="h-4 w-4"></label>
@@ -765,4 +761,3 @@
     </script>
 </body>
 </html>
-
