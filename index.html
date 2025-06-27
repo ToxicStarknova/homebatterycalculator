@@ -23,13 +23,12 @@
         .result-value { @apply text-3xl font-bold text-gray-900 mt-1; }
         .nav-btn { @apply p-2 rounded-full text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors; }
         .info-button { @apply ml-2 text-gray-400 hover:text-indigo-600 cursor-pointer; }
-        .strategy-description { @apply p-4 mt-2 bg-gray-100 rounded-md border border-gray-200 text-sm; }
+        .strategy-description { @apply p-3 mt-2 bg-gray-100 rounded-md border border-gray-200 text-sm text-gray-600; }
         .tariff-table { @apply w-full text-sm text-left border-collapse; }
         .tariff-table th, .tariff-table td { @apply p-2 border-b border-gray-200; }
         .tariff-table th { @apply font-semibold bg-gray-50; }
         .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 text-gray-900; }
         .tariff-table .force-cb-label { @apply flex items-center justify-center cursor-pointer; }
-        /* CHANGED: Tooltip styles for better visibility */
         .tooltip { @apply absolute z-10 hidden w-64 p-3 text-xs text-blue-800 transition-opacity duration-300 bg-blue-50 border border-blue-200 rounded-lg shadow-lg; }
     </style>
 </head>
@@ -39,7 +38,6 @@
         <header class="text-center mb-8 relative">
             <h1 class="text-4xl font-bold text-indigo-600">Home Battery Savings Calculator</h1>
             <p class="mt-2 text-lg text-gray-600 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
-            <!-- REMOVED: Theme toggle button -->
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -61,9 +59,9 @@
 
                 <hr class="my-6 border-gray-200">
 
-                <!-- Section 2: System & Strategy -->
+                <!-- Section 2: System Technical Details -->
                 <div class="mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">2. System & Strategy</h3>
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">2. System Technical Details</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="input-group">
                             <label for="batterySize" class="input-label">Battery Capacity (kWh)</label>
@@ -104,27 +102,38 @@
                             <div id="tooltip-max-soc" role="tooltip" class="tooltip hidden">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
                         </div>
                     </div>
-                     <hr class="my-6 border-gray-200">
-                     <div class="input-group">
-                        <label for="strategySelector" class="input-label">Simulation Selection<button id="strategy-info-btn" class="info-button" data-tooltip-target="tooltip-strategy"><i data-lucide="info" class="h-4 w-4"></i></button></label>
-                        <select id="strategySelector" class="input-field">
-                            <option value="self-consumption">Self-Consumption</option>
-                            <option value="export-maximiser" selected>Export Maximiser</option>
-                        </select>
-                         <div id="tooltip-strategy" role="tooltip" class="tooltip hidden">Choose how the battery should operate. 'Self-Consumption' prioritises using your own solar. 'Export Maximiser' uses smart tariffs to charge from the grid.</div>
-                    </div>
-                    <div id="strategy-descriptions" class="hidden">
-                        <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
-                        <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
-                    </div>
-                    <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                 </div>
 
                 <hr class="my-6 border-gray-200">
 
-                <!-- Section 3: Financials -->
+                <!-- Section 3: Simulation Selection -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">3. Simulation Selection</h3>
+                    <div class="space-y-4">
+                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
+                            <div class="flex items-center">
+                                <input id="strategy-self-consumption" type="radio" value="self-consumption" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <span class="ml-3 font-medium">Self-Consumption</span>
+                            </div>
+                            <div id="desc-self-consumption" class="strategy-description hidden">Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</div>
+                        </label>
+
+                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
+                             <div class="flex items-center">
+                                <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
+                                <span class="ml-3 font-medium">Export Maximiser</span>
+                            </div>
+                            <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
+                            <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
+                        </label>
+                    </div>
+                </div>
+
+                <hr class="my-6 border-gray-200">
+
+                <!-- Section 4: Financials -->
                 <div>
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">3. Financials</h3>
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">4. Financials</h3>
                     <p class="text-xs text-gray-500 mb-4">Ensure all costs and unit prices include VAT.</p>
                       <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
                       <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200">
@@ -231,13 +240,11 @@
             createHourlyRateInputs();
             lucide.createIcons();
             
-            const strategySelector = document.getElementById('strategySelector');
-            const strategyInfoBtn = document.getElementById('strategy-info-btn');
-            const strategyDescriptions = document.getElementById('strategy-descriptions');
+            const strategyRadios = document.querySelectorAll('input[name="strategy"]');
             const forceChargeWarning = document.getElementById('force-charge-warning');
 
             function updateFinancialsUI() {
-                const strategy = strategySelector.value;
+                const strategy = document.querySelector('input[name="strategy"]:checked').value;
                 document.querySelectorAll('.force-control-col').forEach(c => c.classList.toggle('hidden', strategy !== 'export-maximiser'));
                 
                 const importHourlyRadio = document.getElementById('importTariffHourly');
@@ -250,23 +257,16 @@
                 } else {
                     forceChargeWarning.classList.add('hidden');
                 }
-            }
 
-            function displayStrategyDescription() {
-                const tooltip = document.getElementById('tooltip-strategy');
-                const strategy = strategySelector.value;
+                // Show/hide descriptions
                 document.querySelectorAll('.strategy-description').forEach(el => el.classList.add('hidden'));
                 const descEl = document.getElementById(`desc-${strategy}`);
                 if (descEl) {
                     descEl.classList.remove('hidden');
-                    if(tooltip) tooltip.classList.add('hidden'); 
                 }
             }
             
-            strategyInfoBtn.addEventListener('click', (e) => { 
-                e.stopPropagation();
-                strategyDescriptions.classList.toggle('hidden'); 
-            });
+            strategyRadios.forEach(radio => radio.addEventListener('change', updateFinancialsUI));
 
             document.querySelectorAll('[data-tooltip-target]').forEach(button => {
                 const tooltipId = button.getAttribute('data-tooltip-target');
@@ -284,18 +284,10 @@
                 }
             });
 
-            document.addEventListener('click', (e) => {
+            document.addEventListener('click', () => {
                  document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.classList.add('hidden'));
-                 if (!e.target.closest('#strategy-info-btn') && !e.target.closest('#strategy-descriptions')) {
-                    strategyDescriptions.classList.add('hidden');
-                 }
             });
 
-
-            strategySelector.addEventListener('change', () => {
-                updateFinancialsUI();
-                strategyDescriptions.classList.add('hidden');
-            });
             
             document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
@@ -370,7 +362,7 @@
                     maxDischargeRate: parseFloat(document.getElementById('chargeRate').value),
                     roundtripEfficiency: parseFloat(document.getElementById('roundtripEfficiency').value) / 100,
                     systemCost: parseFloat(document.getElementById('systemCost').value),
-                    strategy: document.getElementById('strategySelector').value,
+                    strategy: document.querySelector('input[name="strategy"]:checked').value,
                     mic: parseFloat(document.getElementById('mic').value),
                     mec: parseFloat(document.getElementById('mec').value),
                     importPrices: [],
