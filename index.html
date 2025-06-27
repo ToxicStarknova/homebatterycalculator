@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
+            // Dark mode removed
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,57 +15,55 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .input-group { @apply mb-4 relative; } /* Added relative positioning for tooltips */
-        .input-label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center; } /* Flex for icon alignment */
-        .input-field { @apply w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 focus:ring-indigo-500 focus:border-indigo-500; }
-        .dark .input-field { @apply text-white; }
-        .result-card { @apply bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md; }
-        .result-title { @apply text-lg font-medium text-gray-500 dark:text-gray-400 flex items-center; }
-        .result-value { @apply text-3xl font-bold text-gray-900 dark:text-white mt-1; }
-        .nav-btn { @apply p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors; }
-        .info-button { @apply ml-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer; }
-        .strategy-description { @apply p-4 mt-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600 text-sm; }
+        .input-group { @apply mb-4 relative; }
+        .input-label { @apply block text-sm font-medium text-gray-700 mb-1 flex items-center; }
+        .input-field { @apply w-full p-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-indigo-500 focus:border-indigo-500; }
+        .result-card { @apply bg-white p-6 rounded-lg shadow-md; }
+        .result-title { @apply text-lg font-medium text-gray-500 flex items-center; }
+        .result-value { @apply text-3xl font-bold text-gray-900 mt-1; }
+        .nav-btn { @apply p-2 rounded-full text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors; }
+        .info-button { @apply ml-2 text-gray-400 hover:text-indigo-600 cursor-pointer; }
+        .strategy-description { @apply p-4 mt-2 bg-gray-100 rounded-md border border-gray-200 text-sm; }
         .tariff-table { @apply w-full text-sm text-left border-collapse; }
-        .tariff-table th, .tariff-table td { @apply p-2 border-b border-gray-200 dark:border-gray-700; }
-        .tariff-table th { @apply font-semibold bg-gray-50 dark:bg-gray-800; }
-        .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white; }
+        .tariff-table th, .tariff-table td { @apply p-2 border-b border-gray-200; }
+        .tariff-table th { @apply font-semibold bg-gray-50; }
+        .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 text-gray-900; }
         .tariff-table .force-cb-label { @apply flex items-center justify-center cursor-pointer; }
-        /* ADDED: Tooltip styles */
-        .tooltip { @apply absolute z-10 hidden w-64 p-3 -mt-2 -ml-3 text-sm text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm dark:bg-gray-700; }
-        .tooltip-arrow { @apply absolute w-0 h-0 border-transparent border-t-gray-900 dark:border-t-gray-700; }
+        /* CHANGED: Tooltip styles for better visibility */
+        .tooltip { @apply absolute z-10 hidden w-64 p-3 text-xs text-blue-800 transition-opacity duration-300 bg-blue-50 border border-blue-200 rounded-lg shadow-lg; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+<body class="bg-gray-50 text-gray-900">
 
     <div class="container mx-auto p-4 md:p-8">
         <header class="text-center mb-8 relative">
-            <h1 class="text-4xl font-bold text-indigo-600 dark:text-indigo-400">Home Battery Savings Calculator</h1>
-            <p class="mt-2 text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
-            <button id="theme-toggle" class="absolute top-0 right-0 p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"><i data-lucide="sun" class="h-6 w-6 hidden dark:block"></i><i data-lucide="moon" class="h-6 w-6 block dark:hidden"></i></button>
+            <h1 class="text-4xl font-bold text-indigo-600">Home Battery Savings Calculator</h1>
+            <p class="mt-2 text-lg text-gray-600 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
+            <!-- REMOVED: Theme toggle button -->
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg self-start sticky top-8">
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg self-start sticky top-8">
                 <h2 class="text-2xl font-semibold mb-4 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
                 
-                <button id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
-                <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400"></p>
+                <button id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
+                <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500"></p>
 
                 <!-- Section 1: HDF Upload -->
                 <div class="pt-4 mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">1. Upload HDF File</h3>
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">1. Upload HDF File</h3>
                     <div class="input-group">
                         <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
-                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
+                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <p class="text-xs text-gray-500 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
                     </div>
                 </div>
 
-                <hr class="my-6 border-gray-200 dark:border-gray-700">
+                <hr class="my-6 border-gray-200">
 
                 <!-- Section 2: System & Strategy -->
                 <div class="mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">2. System & Strategy</h3>
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">2. System & Strategy</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="input-group">
                             <label for="batterySize" class="input-label">Battery Capacity (kWh)</label>
@@ -74,7 +72,7 @@
                         <div class="input-group">
                             <label for="usableCapacity" class="input-label">Usable Capacity (%)<button class="info-button" data-tooltip-target="tooltip-usable-capacity"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                             <input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100">
-                            <div id="tooltip-usable-capacity" role="tooltip" class="tooltip">The percentage of the total battery capacity you can actually use, as limited by the manufacturer to protect the battery.</div>
+                            <div id="tooltip-usable-capacity" role="tooltip" class="tooltip hidden">The percentage of the total battery capacity you can actually use, as limited by the manufacturer to protect the battery.</div>
                         </div>
                         <div class="input-group">
                             <label for="chargeRate" class="input-label">Charge/Discharge (kW)</label>
@@ -83,53 +81,53 @@
                         <div class="input-group">
                             <label for="roundtripEfficiency" class="input-label">Efficiency (%)<button class="info-button" data-tooltip-target="tooltip-efficiency"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                             <input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100">
-                             <div id="tooltip-efficiency" role="tooltip" class="tooltip">The round-trip efficiency. Energy is lost during both charging and discharging. 90% is a typical value.</div>
+                             <div id="tooltip-efficiency" role="tooltip" class="tooltip hidden">The round-trip efficiency. Energy is lost during both charging and discharging. 90% is a typical value.</div>
                         </div>
                         <div class="input-group">
                             <label for="mic" class="input-label">Max Import (kW)<button class="info-button" data-tooltip-target="tooltip-mic"><i data-lucide="info" class="h-4 w-4"></i></button></label>
-                            <input type="number" id="mic" class="input-field" value="16">
-                             <div id="tooltip-mic" role="tooltip" class="tooltip">Your home's maximum import capacity from the grid, set by your provider (e.g., 16kW for standard domestic).</div>
+                            <input type="number" id="mic" class="input-field" value="12">
+                             <div id="tooltip-mic" role="tooltip" class="tooltip hidden">Your home's maximum import capacity from the grid, set by your provider (e.g., 12kW for standard domestic).</div>
                         </div>
                         <div class="input-group">
                             <label for="mec" class="input-label">Max Export (kW)<button class="info-button" data-tooltip-target="tooltip-mec"><i data-lucide="info" class="h-4 w-4"></i></button></label>
-                            <input type="number" id="mec" class="input-field" value="4">
-                            <div id="tooltip-mec" role="tooltip" class="tooltip">Your home's maximum allowed export power to the grid. Often limited by the inverter or network operator (e.g., 4kW).</div>
+                            <input type="number" id="mec" class="input-field" value="6">
+                            <div id="tooltip-mec" role="tooltip" class="tooltip hidden">Your home's maximum allowed export power to the grid. Often limited by the inverter or network operator (e.g., 6kW).</div>
                         </div>
                         <div class="input-group">
                             <label for="minSoc" class="input-label">Min SoC (%)<button class="info-button" data-tooltip-target="tooltip-min-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                             <input type="number" id="minSoc" class="input-field" value="10" min="0" max="100">
-                            <div id="tooltip-min-soc" role="tooltip" class="tooltip">The minimum charge level you want to keep in the battery for backup or to prolong its life.</div>
+                            <div id="tooltip-min-soc" role="tooltip" class="tooltip hidden">The minimum charge level you want to keep in the battery for backup or to prolong its life.</div>
                         </div>
                         <div class="input-group">
                             <label for="maxSoc" class="input-label">Max SoC (%)<button class="info-button" data-tooltip-target="tooltip-max-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                             <input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100">
-                            <div id="tooltip-max-soc" role="tooltip" class="tooltip">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
+                            <div id="tooltip-max-soc" role="tooltip" class="tooltip hidden">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
                         </div>
                     </div>
-                     <hr class="my-6 border-gray-200 dark:border-gray-700">
+                     <hr class="my-6 border-gray-200">
                      <div class="input-group">
                         <label for="strategySelector" class="input-label">Simulation Selection<button id="strategy-info-btn" class="info-button" data-tooltip-target="tooltip-strategy"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                         <select id="strategySelector" class="input-field">
                             <option value="self-consumption">Self-Consumption</option>
                             <option value="export-maximiser" selected>Export Maximiser</option>
                         </select>
-                         <div id="tooltip-strategy" role="tooltip" class="tooltip">Choose how the battery should operate. 'Self-Consumption' prioritises using your own solar. 'Export Maximiser' uses smart tariffs to charge from the grid.</div>
+                         <div id="tooltip-strategy" role="tooltip" class="tooltip hidden">Choose how the battery should operate. 'Self-Consumption' prioritises using your own solar. 'Export Maximiser' uses smart tariffs to charge from the grid.</div>
                     </div>
-                    <div id="strategy-descriptions">
+                    <div id="strategy-descriptions" class="hidden">
                         <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
                         <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
                     </div>
-                    <p id="force-charge-warning" class="text-red-500 dark:text-red-400 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
+                    <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                 </div>
 
-                <hr class="my-6 border-gray-200 dark:border-gray-700">
+                <hr class="my-6 border-gray-200">
 
                 <!-- Section 3: Financials -->
                 <div>
-                    <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Ensure all costs and unit prices include VAT.</p>
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">3. Financials</h3>
+                    <p class="text-xs text-gray-500 mb-4">Ensure all costs and unit prices include VAT.</p>
                       <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
-                      <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
+                      <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200">
                           <h4 class="font-semibold mb-2">Import Tariff</h4>
                            <div class="grid grid-cols-2 gap-4 mb-4">
                                <label for="importTariffFlat" class="flex items-center cursor-pointer">
@@ -144,7 +142,7 @@
                           <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
                           <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
                       </div>
-                       <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
+                       <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200">
                           <h4 class="font-semibold mb-2">Export Tariff</h4>
                            <div class="grid grid-cols-2 gap-4 mb-4">
                                 <label for="exportTariffFlat" class="flex items-center cursor-pointer">
@@ -163,10 +161,10 @@
             </div>
 
             <div id="resultsPanel" class="lg:col-span-2 hidden">
-                <h2 class="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-200">"Before" Scenario Summary</h2>
+                <h2 class="text-3xl font-bold mb-4 text-gray-800">"Before" Scenario Summary</h2>
                 <div id="beforeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"></div>
 
-                <h2 class="text-3xl font-bold mb-4 text-gray-800 dark:text-gray-200">"After" Scenario Annual Summary</h2>
+                <h2 class="text-3xl font-bold mb-4 text-gray-800">"After" Scenario Annual Summary</h2>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
                     <div class="result-card"><h3 class="result-title"><i data-lucide="log-in" class="mr-2 h-5 w-5"></i>Annual Import</h3><p id="annualImportAfter" class="result-value">0 kWh</p></div>
                     <div class="result-card"><h3 class="result-title"><i data-lucide="log-out" class="mr-2 h-5 w-5"></i>Annual Export</h3><p id="annualExportAfter" class="result-value">0 kWh</p></div>
@@ -176,14 +174,14 @@
                     <div class="result-card"><h3 class="result-title"><i data-lucide="sun" class="mr-2 h-5 w-5"></i>Self-Sufficiency</h3><p id="selfSufficiency" class="result-value">0%</p></div>
                 </div>
 
-                <hr class="my-12 border-gray-300 dark:border-gray-700"/>
+                <hr class="my-12 border-gray-300"/>
 
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
                     <h3 class="text-xl font-semibold text-center mb-4">Total Monthly Consumption (Last 12 Months)</h3>
                     <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
                 </div>
                 
-                <div class="flex justify-between items-center mb-4"><h2 class="text-3xl font-bold text-gray-800 dark:text-gray-200">Daily Analysis</h2><button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-3xl font-bold text-gray-800">Daily Analysis</h2><button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white p-6 rounded-lg shadow-lg">
                     <div class="flex items-center justify-center mb-2 relative">
                         <button id="prevDayBtn" class="nav-btn absolute left-0"><i data-lucide="arrow-left" class="h-5 w-5"></i></button>
                         <h3 class="text-xl font-semibold text-center">Energy Flow for <span id="chartDate"></span></h3>
@@ -193,7 +191,7 @@
                     <div class="relative h-[120px]"><canvas id="socChart"></canvas></div>
                 </div><div class="result-card p-4"><h3 class="font-semibold text-lg mb-2">Summary for <span id="summaryMonth"></span></h3><ul class="space-y-2 text-sm" id="monthlySummaryList"></ul></div></div>
             </div>
-            <div id="welcomePanel" class="lg:col-span-2 flex items-center justify-center bg-gray-100 dark:bg-gray-800/50 rounded-lg shadow-inner"><div class="text-center p-10"><i data-lucide="line-chart" class="mx-auto h-20 w-20 text-indigo-300 dark:text-indigo-600"></i><h2 class="mt-4 text-2xl font-semibold">Ready to Analyze Your Energy Future?</h2><p class="mt-2 text-gray-500 dark:text-gray-400">Upload your data and configure your system on the left to get started.</p></div></div>
+            <div id="welcomePanel" class="lg:col-span-2 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner"><div class="text-center p-10"><i data-lucide="line-chart" class="mx-auto h-20 w-20 text-indigo-300"></i><h2 class="mt-4 text-2xl font-semibold">Ready to Analyze Your Energy Future?</h2><p class="mt-2 text-gray-500">Upload your data and configure your system on the left to get started.</p></div></div>
         </div>
     </div>
 
@@ -205,26 +203,11 @@
             const FLOAT_TOLERANCE = 0.001;
 
             let fullData = [], simulationResults = {}, energyChart = null, socChart = null, monthlyConsumptionChart = null, isSimulating = false;
-
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            const htmlEl = document.documentElement;
-            const applyTheme = (theme) => {
-                htmlEl.classList.toggle('dark', theme === 'dark');
-                localStorage.setItem('theme', theme);
-                if (simulationResults.detailedLog) {
-                    const daySelector = document.getElementById('daySelector');
-                    if (daySelector.value) updateDailyView(daySelector.value);
-                    if (monthlyConsumptionChart) generateMonthlyConsumptionChart();
-                }
-            };
-            themeToggleBtn.addEventListener('click', () => applyTheme(htmlEl.classList.contains('dark') ? 'light' : 'dark'));
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            applyTheme(savedTheme);
             
             function createHourlyRateInputs() {
                 const createTable = (type, defaultValue) => {
                     let tableHTML = `<table class="tariff-table"><thead><tr>
-                        <th class="border-r border-gray-200 dark:border-gray-700">Time</th>
+                        <th class="border-r border-gray-200">Time</th>
                         <th class="text-center">Rate</th>
                         <th class="force-control-col hidden text-center" title="Force Charge"><i data-lucide="zap" class="h-4 w-4 inline-block"></i></th>
                     </tr></thead><tbody>`;
@@ -232,7 +215,7 @@
                     for (let i = 0; i < 24; i++) {
                         const hour = i.toString().padStart(2, '0');
                         tableHTML += `<tr>
-                            <td class="border-r border-gray-200 dark:border-gray-700">${hour}:00-${hour}:59</td>
+                            <td class="border-r border-gray-200">${hour}:00-${hour}:59</td>
                             <td class="text-center"><input type="number" id="${type}-rate-${i}" class="input-field rate-input" value="${defaultValue}" step="0.01"></td>
                             <td class="force-control-col hidden text-center">
                                 <label class="force-cb-label"><input type="checkbox" id="${type}-force-charge-${i}" class="h-4 w-4"></label>
@@ -276,11 +259,12 @@
                 const descEl = document.getElementById(`desc-${strategy}`);
                 if (descEl) {
                     descEl.classList.remove('hidden');
-                    if(tooltip) tooltip.classList.add('hidden'); // Hide tooltip when main description is shown
+                    if(tooltip) tooltip.classList.add('hidden'); 
                 }
             }
             
-            strategyInfoBtn.addEventListener('click', () => { 
+            strategyInfoBtn.addEventListener('click', (e) => { 
+                e.stopPropagation();
                 strategyDescriptions.classList.toggle('hidden'); 
             });
 
@@ -289,25 +273,20 @@
                 const tooltip = document.getElementById(tooltipId);
                 if (tooltip) {
                     button.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent the document click from firing immediately
+                        e.stopPropagation();
+                        document.querySelectorAll('.tooltip').forEach(t => {
+                            if (t.id !== tooltipId) {
+                                t.classList.add('hidden');
+                            }
+                        });
                         tooltip.classList.toggle('hidden');
                     });
                 }
             });
 
             document.addEventListener('click', (e) => {
-                 let clickedOnInfoButton = e.target.closest('.info-button');
-                 
-                 // Hide all tooltips if the click is not on an info button
-                 if (!clickedOnInfoButton) {
-                    document.querySelectorAll('.tooltip').forEach(tooltip => {
-                        tooltip.classList.add('hidden');
-                    });
-                 }
-                 
-                 // Special handling for strategy description
-                 let clickedOnStrategyButton = e.target.closest('#strategy-info-btn');
-                 if (!clickedOnStrategyButton && e.target.id !== 'strategySelector' && !strategyDescriptions.contains(e.target)) {
+                 document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.classList.add('hidden'));
+                 if (!e.target.closest('#strategy-info-btn') && !e.target.closest('#strategy-descriptions')) {
                     strategyDescriptions.classList.add('hidden');
                  }
             });
@@ -315,7 +294,7 @@
 
             strategySelector.addEventListener('change', () => {
                 updateFinancialsUI();
-                displayStrategyDescription();
+                strategyDescriptions.classList.add('hidden');
             });
             
             document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
@@ -570,7 +549,7 @@
                 };
             }
 
-            function setStatus(message, type = 'info') { const statusEl = document.getElementById('status'); statusEl.textContent = message; statusEl.className = 'text-center mt-2 mb-4 text-sm font-medium'; if (type === 'error') statusEl.classList.add('text-red-500'); if (type === 'success') statusEl.classList.add('text-green-500'); if (type === 'warning') statusEl.classList.add('text-yellow-500'); if (type === 'loading') statusEl.classList.add('text-gray-500', 'dark:text-gray-400'); }
+            function setStatus(message, type = 'info') { const statusEl = document.getElementById('status'); statusEl.textContent = message; statusEl.className = 'text-center mt-2 mb-4 text-sm font-medium'; if (type === 'error') statusEl.classList.add('text-red-500'); if (type === 'success') statusEl.classList.add('text-green-500'); if (type === 'warning') statusEl.classList.add('text-yellow-500'); if (type === 'loading') statusEl.classList.add('text-gray-500'); }
             function filterLast12FullMonths(data) { if (data.length === 0) return []; const latestTimestamp = data[data.length - 1].timestamp; const endDate = new Date(latestTimestamp); endDate.setUTCDate(1); endDate.setUTCHours(0, 0, 0, 0); const startDate = new Date(endDate); startDate.setUTCFullYear(startDate.getUTCFullYear() - 1); return data.filter(row => row.timestamp >= startDate && row.timestamp < endDate); }
             function parseHDF(csvText) { const lines = csvText.trim().split('\n'); let headerIndex = -1, header; for (let i = 0; i < lines.length; i++) { const lowerLine = lines[i].toLowerCase(); if (lowerLine.includes('read date') && lowerLine.includes('read type') && (lowerLine.includes('read value') || lowerLine.includes('read val'))) { headerIndex = i; header = lines[i].split(',').map(h => h.trim().replace(/"/g, '')); break; } } if (headerIndex === -1) throw new Error('Could not find a valid header row in HDF file.'); const dateIndex = header.findIndex(h => h.toLowerCase().includes('read date')); const typeIndex = header.findIndex(h => h.toLowerCase().includes('read type')); const valueIndex = header.findIndex(h => h.toLowerCase().includes('read value') || h.toLowerCase().includes('read val')); if (dateIndex === -1 || typeIndex === -1 || valueIndex === -1) throw new Error('HDF file is missing required columns (Date, Type, or Value).'); const dataMap = new Map(); for (let i = headerIndex + 1; i < lines.length; i++) { if (!lines[i].trim()) continue; const values = lines[i].split(','); if (values.length <= Math.max(dateIndex, typeIndex, valueIndex)) continue; const dateStr = values[dateIndex]?.trim().replace(/"/g, ''); const dateParts = dateStr?.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})\s(\d{2}):(\d{2})/); if (!dateParts) continue; const [, day, month, year, hour, minute] = dateParts; const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`); if (isNaN(originalTimestamp.getTime())) continue; const halfHourBucketTimestamp = new Date(originalTimestamp); halfHourBucketTimestamp.setUTCMinutes(Math.floor(originalTimestamp.getUTCMinutes() / 30) * 30, 0, 0); const key = halfHourBucketTimestamp.toISOString(); const readType = values[typeIndex]?.trim().replace(/"/g, ''); const readValue = parseFloat(values[valueIndex]); if (!readType || isNaN(readValue)) continue; if (!dataMap.has(key)) dataMap.set(key, { timestamp: halfHourBucketTimestamp, consumption: 0, generation: 0 }); const entry = dataMap.get(key); if (readType.toLowerCase().includes('active import')) entry.consumption += readValue; else if (readType.toLowerCase().includes('active export')) entry.generation += readValue; } if (dataMap.size === 0) return []; return Array.from(dataMap.values()).sort((a, b) => a.timestamp - b.timestamp); }
             
@@ -633,9 +612,8 @@
                 });
                 const monthData = Object.keys(simulationResults.monthlyData).sort().map(key => simulationResults.monthlyData[key].consumption);
 
-                const isDarkMode = document.documentElement.classList.contains('dark');
-                const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                const labelColor = isDarkMode ? '#cbd5e1' : '#4b5563';
+                const gridColor = 'rgba(0, 0, 0, 0.1)';
+                const labelColor = '#4b5563';
 
                 monthlyConsumptionChart = new Chart(ctx, {
                     type: 'bar',
@@ -671,10 +649,10 @@
                 const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value); 
                 const formatKWh = (value) => `${value.toFixed(1)} kWh`; 
                 
-                let summaryHTML = `<li class="flex justify-between"><span>Monthly Savings:</span><span class="font-mono font-bold">${formatCurrency(monthSummary.savings)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Total Consumption:</span><span class="font-mono">${formatKWh(monthSummary.consumption)}</span></li><li class="flex justify-between"><span>Total Generation:</span><span class="font-mono">${formatKWh(monthSummary.generation)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Import w/o Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithoutBattery || 0)}</span></li><li class="flex justify-between"><span>Import w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithBattery)}</span></li><li class="flex justify-between"><span>Export w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.exportWithBattery)}</span></li><li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between"><span>Charged to Battery:</span><span class="font-mono">${formatKWh(monthSummary.chargedToBattery)}</span></li><li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>`;
+                let summaryHTML = `<li class="flex justify-between"><span>Monthly Savings:</span><span class="font-mono font-bold">${formatCurrency(monthSummary.savings)}</span></li><li class="border-t border-gray-200 my-2"></li><li class="flex justify-between"><span>Total Consumption:</span><span class="font-mono">${formatKWh(monthSummary.consumption)}</span></li><li class="flex justify-between"><span>Total Generation:</span><span class="font-mono">${formatKWh(monthSummary.generation)}</span></li><li class="border-t border-gray-200 my-2"></li><li class="flex justify-between"><span>Import w/o Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithoutBattery || 0)}</span></li><li class="flex justify-between"><span>Import w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.importWithBattery)}</span></li><li class="flex justify-between"><span>Export w/ Battery:</span><span class="font-mono">${formatKWh(monthSummary.exportWithBattery)}</span></li><li class="border-t border-gray-200 my-2"></li><li class="flex justify-between"><span>Charged to Battery:</span><span class="font-mono">${formatKWh(monthSummary.chargedToBattery)}</span></li><li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>`;
 
                 if (getSimulationParameters().strategy === 'export-maximiser' && monthSummary.missedFullCharges > 0) {
-                    summaryHTML += `<li class="border-t border-gray-200 dark:border-gray-700 my-2"></li><li class="flex justify-between text-yellow-500"><span>Missed Full Charges:</span><span class="font-mono font-bold">${monthSummary.missedFullCharges} days</span></li>`;
+                    summaryHTML += `<li class="border-t border-gray-200 my-2"></li><li class="flex justify-between text-yellow-500"><span>Missed Full Charges:</span><span class="font-mono font-bold">${monthSummary.missedFullCharges} days</span></li>`;
                 }
                 document.getElementById('monthlySummaryList').innerHTML = summaryHTML;
             }
@@ -709,10 +687,9 @@
             function navigateDay(direction) { const daySelector = document.getElementById('daySelector'); const currentIndex = daySelector.selectedIndex; const newIndex = currentIndex + direction; if (newIndex >= 0 && newIndex < daySelector.options.length) { daySelector.selectedIndex = newIndex; daySelector.dispatchEvent(new Event('change')); } }
             
             function getEnergyChartConfig(chartData) {
-                const isDarkMode = document.documentElement.classList.contains('dark');
-                const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                const labelColor = isDarkMode ? '#cbd5e1' : '#4b5563';
-                const baselineColor = isDarkMode ? '#a78bfa' : '#8b5cf6';
+                const gridColor = 'rgba(0, 0, 0, 0.1)';
+                const labelColor = '#4b5563';
+                const baselineColor = '#8b5cf6';
                 const netFlowColor = '#ef4444';
                 const zeroLineColor = '#22c55e';
 
@@ -762,10 +739,9 @@
             }
 
             function getSoCChartConfig(chartData) {
-                const isDarkMode = document.documentElement.classList.contains('dark');
-                const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                const labelColor = isDarkMode ? '#cbd5e1' : '#4b5563';
-                const socColor = isDarkMode ? '#60a5fa' : '#3b82f6';
+                const gridColor = 'rgba(0, 0, 0, 0.1)';
+                const labelColor = '#4b5563';
+                const socColor = '#3b82f6';
 
                 return {
                     type: 'bar',
