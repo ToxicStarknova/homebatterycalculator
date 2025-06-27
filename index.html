@@ -50,44 +50,43 @@
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">2. System & Strategy</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="input-group"><label for="batterySize" class="input-label">Battery Capacity (kWh)</label><input type="number" id="batterySize" class="input-field" value="10"></div>
-                        <div class="input-group"><label for="usableCapacity" class="input-label">Usable Capacity (%)</label><input type="number" id="usableCapacity" class="input-field" value="90"></div>
+                        <div class="input-group"><label for="usableCapacity" class="input-label">Usable Capacity (%)</label><input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100"></div>
                         <div class="input-group"><label for="chargeRate" class="input-label">Charge/Discharge (kW)</label><input type="number" id="chargeRate" class="input-field" value="5"></div>
-                        <div class="input-group"><label for="roundtripEfficiency" class="input-label">Efficiency (%)</label><input type="number" id="roundtripEfficiency" class="input-field" value="90"></div>
+                        <div class="input-group"><label for="roundtripEfficiency" class="input-label">Efficiency (%)</label><input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100"></div>
                         <div class="input-group"><label for="mic" class="input-label">Max Import (kW)</label><input type="number" id="mic" class="input-field" value="16"></div>
                         <div class="input-group"><label for="mec" class="input-label">Max Export (kW)</label><input type="number" id="mec" class="input-field" value="4"></div>
-                        <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10"></div>
-                        <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100"></div>
+                        <div class="input-group"><label for="minSoc" class="input-label">Min SoC (%)</label><input type="number" id="minSoc" class="input-field" value="10" min="0" max="100"></div>
+                        <div class="input-group"><label for="maxSoc" class="input-label">Max SoC (%)</label><input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100"></div>
                     </div>
                      <div class="input-group">
-                        <label for="strategySelector" class="input-label flex items-center">Battery Strategy<i id="strategy-info-btn" data-lucide="info" class="h-4 w-4 info-button"></i></label>
+                        <label for="strategySelector" class="input-label flex items-center">Battery Strategy<button type="button" id="strategy-info-btn" aria-label="Strategy Information" class="info-button"><i data-lucide="info" class="h-4 w-4"></i></button></label>
                         <select id="strategySelector" class="input-field">
                             <option value="self-consumption">Self-Consumption</option>
                             <option value="export-maximiser" selected>Export Maximiser</option>
                         </select>
-                     </div>
-                     <div id="strategy-descriptions" class="hidden">
+                    </div>
+                    <div id="strategy-descriptions">
                         <div id="desc-self-consumption" class="strategy-description hidden"><h4 class="font-bold mb-1">Self-Consumption (Solar Maximiser)</h4><p>Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</p></div>
-                        <!-- Change: Updated description to include Force Discharge -->
                         <div id="desc-export-maximiser" class="strategy-description"><h4 class="font-bold mb-1">Export Maximiser (Tariff Optimiser)</h4><p>Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space. During other times, it uses solar and battery power to run the home before importing from the grid.</p></div>
-                     </div>
+                    </div>
                 </div>
 
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
-                     <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
-                     <p class="text-xs text-gray-500 dark:text-gray-400 -mt-3 mb-3">Unit prices should include VAT.</p>
-                     <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
-                        <h4 class="font-semibold mb-2">Import Tariff</h4>
-                        <div class="flex items-center space-x-4 mb-4"><input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
-                        <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
-                        <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
-                     </div>
-                      <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
-                        <h4 class="font-semibold mb-2">Export Tariff</h4>
-                        <div class="flex items-center space-x-4 mb-4"><input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
-                        <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
-                        <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
-                     </div>
+                      <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 -mt-3 mb-3">Unit prices should include VAT.</p>
+                      <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
+                          <h4 class="font-semibold mb-2">Import Tariff</h4>
+                          <div class="flex items-center space-x-4 mb-4"><input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="importTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
+                          <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
+                          <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
+                      </div>
+                       <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200 dark:border-gray-700">
+                          <h4 class="font-semibold mb-2">Export Tariff</h4>
+                          <div class="flex items-center space-x-4 mb-4"><input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffFlat" class="ml-2 block text-sm">Flat Rate</label><input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"><label for="exportTariffHourly" class="ml-2 block text-sm">Hourly</label></div>
+                          <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
+                          <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
+                      </div>
                 </div>
                 <button id="calculateBtn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
                 <p id="status" class="text-center mt-4 text-sm text-gray-500 dark:text-gray-400"></p>
@@ -110,8 +109,8 @@
                 <hr class="my-12 border-gray-300 dark:border-gray-700"/>
 
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
-                     <h3 class="text-xl font-semibold text-center mb-4">Total Monthly Consumption (Last 12 Months)</h3>
-                     <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
+                    <h3 class="text-xl font-semibold text-center mb-4">Total Monthly Consumption (Last 12 Months)</h3>
+                    <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
                 </div>
                 
                 <div class="flex justify-between items-center mb-4"><h2 class="text-3xl font-bold text-gray-800 dark:text-gray-200">Daily Analysis</h2><button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -197,13 +196,13 @@
             
             strategyInfoBtn.addEventListener('click', () => { 
                 strategyDescriptions.classList.toggle('hidden'); 
-                if(!strategyDescriptions.classList.contains('hidden')) {
-                    displayStrategyDescription();
-                }
             });
+
             strategySelector.addEventListener('change', () => {
                 updateFinancialsUI();
                 displayStrategyDescription();
+                // If the main description container is hidden, a change in selector shouldn't make it appear.
+                // The user can toggle it with the info button when they want.
             });
             
             document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
@@ -215,6 +214,8 @@
                 });
             });
             
+            // Initial UI setup
+            displayStrategyDescription(); // Show description for default selected strategy
             updateFinancialsUI();
             document.getElementById('importTariffHourly').dispatchEvent(new Event('change'));
             document.getElementById('exportTariffFlat').dispatchEvent(new Event('change'));
@@ -373,9 +374,11 @@
                         }
                     }
 
-                    // Step 5: Handle Force Discharge (Export Maximiser only)
+                    // Step 5: Handle Force Discharge (Export Maximiser only) - MODIFIED LOGIC
                     const nextHour = (hour + 1) % 24;
-                    const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && params.forceChargeHours[nextHour];
+                    const hourAfterNext = (hour + 2) % 24;
+                    const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && (params.forceChargeHours[nextHour] || params.forceChargeHours[hourAfterNext]);
+                    
                     if (isPreChargeHour) {
                         const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * 0.5);
                         const currentExportPower = gridExport * 2;
@@ -608,7 +611,7 @@
                         labels: chartData.labels,
                         datasets: [
                             {
-                                label: 'Net Grid Flow (kW)', data: chartData.newNetFlowKw, borderColor: netFlowColor, borderWidth: 2, pointRadius: 0, fill: false, tension: 0.4,
+                                label: 'New Updated Grid Flow', data: chartData.newNetFlowKw, borderColor: netFlowColor, borderWidth: 2, pointRadius: 0, fill: false, tension: 0.4,
                             },
                             {
                                 label: 'Baseline Net (kW)', data: chartData.baseNetKw, borderColor: baselineColor, borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.4,
