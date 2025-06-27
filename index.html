@@ -43,9 +43,26 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg self-start sticky top-8">
-                <h2 class="text-2xl font-semibold mb-6 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
-                <div class="mb-6"><h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">1. Upload HDF File</h3><div class="input-group"><label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label><input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900"><p class="text-xs text-gray-500 dark:text-gray-400 mt-1">For security, you can delete the MPRN and Serial Number columns.</p></div></div>
+                <h2 class="text-2xl font-semibold mb-4 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
                 
+                <!-- MOVED: Run Simulation button is now at the top for easy access -->
+                <button id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
+                <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400"></p>
+
+                <!-- Section 1: HDF Upload -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">1. Upload HDF File</h3>
+                    <div class="input-group">
+                        <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
+                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
+                    </div>
+                </div>
+
+                <!-- ADDED: Divider line -->
+                <hr class="my-6 border-gray-200 dark:border-gray-700">
+
+                <!-- Section 2: System & Strategy -->
                 <div class="mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">2. System & Strategy</h3>
                     <div class="grid grid-cols-2 gap-4">
@@ -71,6 +88,10 @@
                     </div>
                 </div>
 
+                <!-- ADDED: Divider line -->
+                <hr class="my-6 border-gray-200 dark:border-gray-700">
+
+                <!-- Section 3: Financials -->
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 dark:text-indigo-400 mb-2">3. Financials</h3>
                       <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
@@ -88,8 +109,6 @@
                           <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
                       </div>
                 </div>
-                <button id="calculateBtn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
-                <p id="status" class="text-center mt-4 text-sm text-gray-500 dark:text-gray-400"></p>
             </div>
 
             <div id="resultsPanel" class="lg:col-span-2 hidden">
@@ -374,7 +393,7 @@
                         }
                     }
 
-                    // Step 5: Handle Force Discharge (Export Maximiser only) - MODIFIED LOGIC
+                    // Step 5: Handle Force Discharge (Export Maximiser only)
                     const nextHour = (hour + 1) % 24;
                     const hourAfterNext = (hour + 2) % 24;
                     const isPreChargeHour = params.strategy === 'export-maximiser' && !isForceChargeHour && (params.forceChargeHours[nextHour] || params.forceChargeHours[hourAfterNext]);
@@ -456,7 +475,7 @@
                 };
             }
 
-            function setStatus(message, type = 'info') { const statusEl = document.getElementById('status'); statusEl.textContent = message; statusEl.className = 'text-center mt-4 text-sm font-medium'; if (type === 'error') statusEl.classList.add('text-red-500'); if (type === 'success') statusEl.classList.add('text-green-500'); if (type === 'warning') statusEl.classList.add('text-yellow-500'); if (type === 'loading') statusEl.classList.add('text-gray-500', 'dark:text-gray-400'); }
+            function setStatus(message, type = 'info') { const statusEl = document.getElementById('status'); statusEl.textContent = message; statusEl.className = 'text-center mt-2 mb-4 text-sm font-medium'; if (type === 'error') statusEl.classList.add('text-red-500'); if (type === 'success') statusEl.classList.add('text-green-500'); if (type === 'warning') statusEl.classList.add('text-yellow-500'); if (type === 'loading') statusEl.classList.add('text-gray-500', 'dark:text-gray-400'); }
             function filterLast12FullMonths(data) { if (data.length === 0) return []; const latestTimestamp = data[data.length - 1].timestamp; const endDate = new Date(latestTimestamp); endDate.setUTCDate(1); endDate.setUTCHours(0, 0, 0, 0); const startDate = new Date(endDate); startDate.setUTCFullYear(startDate.getUTCFullYear() - 1); return data.filter(row => row.timestamp >= startDate && row.timestamp < endDate); }
             function parseHDF(csvText) { const lines = csvText.trim().split('\n'); let headerIndex = -1, header; for (let i = 0; i < lines.length; i++) { const lowerLine = lines[i].toLowerCase(); if (lowerLine.includes('read date') && lowerLine.includes('read type') && (lowerLine.includes('read value') || lowerLine.includes('read val'))) { headerIndex = i; header = lines[i].split(',').map(h => h.trim().replace(/"/g, '')); break; } } if (headerIndex === -1) throw new Error('Could not find a valid header row in HDF file.'); const dateIndex = header.findIndex(h => h.toLowerCase().includes('read date')); const typeIndex = header.findIndex(h => h.toLowerCase().includes('read type')); const valueIndex = header.findIndex(h => h.toLowerCase().includes('read value') || h.toLowerCase().includes('read val')); if (dateIndex === -1 || typeIndex === -1 || valueIndex === -1) throw new Error('HDF file is missing required columns (Date, Type, or Value).'); const dataMap = new Map(); for (let i = headerIndex + 1; i < lines.length; i++) { if (!lines[i].trim()) continue; const values = lines[i].split(','); if (values.length <= Math.max(dateIndex, typeIndex, valueIndex)) continue; const dateStr = values[dateIndex]?.trim().replace(/"/g, ''); const dateParts = dateStr?.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})\s(\d{2}):(\d{2})/); if (!dateParts) continue; const [, day, month, year, hour, minute] = dateParts; const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`); if (isNaN(originalTimestamp.getTime())) continue; const halfHourBucketTimestamp = new Date(originalTimestamp); halfHourBucketTimestamp.setUTCMinutes(Math.floor(originalTimestamp.getUTCMinutes() / 30) * 30, 0, 0); const key = halfHourBucketTimestamp.toISOString(); const readType = values[typeIndex]?.trim().replace(/"/g, ''); const readValue = parseFloat(values[valueIndex]); if (!readType || isNaN(readValue)) continue; if (!dataMap.has(key)) dataMap.set(key, { timestamp: halfHourBucketTimestamp, consumption: 0, generation: 0 }); const entry = dataMap.get(key); if (readType.toLowerCase().includes('active import')) entry.consumption += readValue; else if (readType.toLowerCase().includes('active export')) entry.generation += readValue; } if (dataMap.size === 0) return []; return Array.from(dataMap.values()).sort((a, b) => a.timestamp - b.timestamp); }
             
