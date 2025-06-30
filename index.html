@@ -15,21 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .input-group { @apply mb-4 relative; }
-        .input-label { @apply block text-sm font-medium text-gray-700 mb-1 flex items-center; }
-        .input-field { @apply w-full p-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-indigo-500 focus:border-indigo-500; }
-        .result-card { @apply bg-white p-6 rounded-lg shadow-md; }
-        .result-title { @apply text-lg font-medium text-gray-500 flex items-center; }
-        .result-value { @apply text-3xl font-bold text-gray-900 mt-1; }
-        .nav-btn { @apply p-2 rounded-full text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors; }
-        .info-button { @apply ml-2 text-gray-400 hover:text-indigo-600 cursor-pointer; }
-        .strategy-description { @apply p-3 mt-2 bg-gray-100 rounded-md border border-gray-200 text-sm text-gray-600; }
-        .tariff-table { @apply w-full text-sm text-left border-collapse; }
-        .tariff-table th, .tariff-table td { @apply p-2 border-b border-gray-200; }
-        .tariff-table th { @apply font-semibold bg-gray-50; }
-        .tariff-table .rate-input { @apply w-20 p-1 text-center bg-gray-100 text-gray-900; }
-        .tariff-table .force-cb-label { @apply flex items-center justify-center cursor-pointer; }
-        .tooltip { @apply absolute z-10 hidden w-64 p-3 text-xs text-blue-800 transition-opacity duration-300 bg-blue-50 border border-blue-200 rounded-lg shadow-lg; }
+        /* Custom styles will be added here if needed, but Tailwind's @apply is not supported by the CDN script. */
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -54,6 +40,61 @@
                         <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
                         <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                         <p class="text-xs text-gray-500 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
+                    </div>
+                </div>
+
+                <!-- Section 1.5: Data Source -->
+                <div class="pt-4 mb-6">
+                    <h3 class="text-lg font-medium text-indigo-600 mb-2">1.5. Solar PV Generation Data</h3>
+                    <div class="space-y-4">
+                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
+                            <div class="flex items-center">
+                                <input id="dataSourceHdf" type="radio" value="hdf" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
+                                <span class="ml-3 font-medium">Use data from HDF file</span>
+                            </div>
+                            <div class="strategy-description">Uses the solar generation (Active Export) data found in your uploaded HDF file.</div>
+                        </label>
+
+                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
+                             <div class="flex items-center">
+                                <input id="dataSourcePvgis" type="radio" value="pvgis" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <span class="ml-3 font-medium">Simulate New PV System</span>
+                            </div>
+                            <div class="strategy-description">Ignores generation data in your HDF and simulates a new solar PV system. Your HDF's consumption data is still used.</div>
+                        </label>
+                    </div>
+
+                    <div id="pvgis-options" class="hidden mt-4 space-y-4 p-4 border-l-4 border-indigo-400 bg-indigo-50">
+                        <p class="text-sm text-gray-700">Upload the hourly PV generation data CSV file you downloaded from PVGIS.</p>
+                        <div class="input-group">
+                            <label for="pvgisFile" class="input-label">PVGIS Hourly Data File (CSV)</label>
+                            <input type="file" id="pvgisFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        </div>
+                        <div class="input-group">
+                            <label for="pvgisScalingFactor" class="input-label">Generation Scaling Factor<button class="info-button" data-tooltip-target="tooltip-scaling-factor"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <input type="number" id="pvgisScalingFactor" class="input-field" value="1" min="0.1" step="0.1">
+                            <div id="tooltip-scaling-factor" role="tooltip" class="tooltip hidden">Use this to scale the generation data from your file. E.g., if you downloaded data for a 1 kWp system but want to simulate a 10 kWp system, set this to 10.</div>
+                        </div>
+                        <div class="text-xs text-gray-600">
+                            <p class="font-semibold">How to get the file:</p>
+                            <ol class="list-decimal list-inside mt-1 space-y-1">
+                                <li>Go to the <a href="https://re.jrc.ec.europa.eu/pvg_tools/en/tools.html#PVP" target="_blank" class="text-indigo-600 hover:underline">PVGIS Hourly Radiation Tool</a>.</li>
+                                <li>Enter your location and PV system details.</li>
+                                <li>Check the box for "PV electricity generation".</li>
+                                <li class="!mt-2"><strong>Note on Azimuth:</strong> PVGIS uses 0° for South, -90° for East, and 90° for West.</li>
+                                <li>Click "Download CSV" to get the file.</li>
+                            </ol>
+                        </div>
+                        <div id="pvgis-summary" class="hidden mt-4 pt-4 border-t border-indigo-200">
+                            <h4 class="font-semibold text-sm mb-2 text-gray-800">PVGIS File Summary</h4>
+                            <div id="pvgis-summary-metrics" class="text-xs text-gray-600 space-y-1 mb-4">
+                                <!-- Metrics will be populated by JS -->
+                            </div>
+                            <div class="relative h-48">
+                                <canvas id="pvgisMonthlyChart"></canvas>
+                            </div>
+                            <p class="text-xs text-center text-gray-500 mt-1">This chart shows the estimated monthly generation from your uploaded file.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -112,7 +153,7 @@
                     <div class="space-y-4">
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
                             <div class="flex items-center">
-                                <input id="strategy-self-consumption" type="radio" value="self-consumption" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <input id="strategy-self-consumption" type="radio" value="self-consumption" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
                                 <span class="ml-3 font-medium">Self-Consumption</span>
                             </div>
                             <div id="desc-self-consumption" class="strategy-description hidden">Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</div>
@@ -120,7 +161,7 @@
 
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
                              <div class="flex items-center">
-                                <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
+                                <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
                                 <span class="ml-3 font-medium">Export Maximiser</span>
                             </div>
                             <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
@@ -174,13 +215,20 @@
                 <div id="beforeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"></div>
 
                 <h2 class="text-3xl font-bold mb-4 text-gray-800">"After" Scenario Annual Summary</h2>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="log-in" class="mr-2 h-5 w-5"></i>Annual Import</h3><p id="annualImportAfter" class="result-value">0 kWh</p></div>
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="log-out" class="mr-2 h-5 w-5"></i>Annual Export</h3><p id="annualExportAfter" class="result-value">0 kWh</p></div>
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="receipt" class="mr-2 h-5 w-5"></i>Bill (After)</h3><p id="annualBillAfter" class="result-value">€0</p></div>
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="piggy-bank" class="mr-2 h-5 w-5"></i>Annual Savings</h3><p id="annualSavings" class="result-value">€0</p></div>
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="calendar-check" class="mr-2 h-5 w-5"></i>Payback Period</h3><p id="paybackPeriod" class="result-value">0 years</p></div>
-                    <div class="result-card"><h3 class="result-title"><i data-lucide="sun" class="mr-2 h-5 w-5"></i>Self-Sufficiency</h3><p id="selfSufficiency" class="result-value">0%</p></div>
+                <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b-2 border-gray-200">
+                                <th class="p-3 text-sm font-semibold text-gray-500">Metric</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Self-Consumption</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Export Maximiser</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTableBody" class="divide-y divide-gray-100">
+                            <!-- Rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-center text-gray-500 mt-2">Select a strategy in the configuration panel to view its detailed daily performance below.</p>
                 </div>
 
                 <div id="optimizationChartContainer" class="bg-white p-6 rounded-lg shadow-lg mb-8 hidden">
@@ -209,7 +257,8 @@
             <div id="welcomePanel" class="lg:col-span-2 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner"><div class="text-center p-10"><i data-lucide="line-chart" class="mx-auto h-20 w-20 text-indigo-300"></i><h2 class="mt-4 text-2xl font-semibold">Ready to Analyze Your Energy Future?</h2><p class="mt-2 text-gray-500">Upload your data and configure your system on the left to get started.</p></div></div>
         </div>
     </div>
-
+    
     <script src="script.js" defer></script>
 </body>
 </html>
+

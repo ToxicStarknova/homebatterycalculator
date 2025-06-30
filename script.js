@@ -18,15 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- APPLICATION STATE --- //
     let fullData = []; // Holds the filtered 12-month dataset from the user's file.
-    let simulationResults = {}; // Stores the results from the main simulation.
+    let simulationResults = {}; // Stores results. Will hold keys for each strategy.
     let isSimulating = false; // Flag to prevent multiple simulations from running at once.
 
     // Chart.js instances. Stored globally to be destroyed and recreated on updates.
-    let energyChart = null;
-    let socChart = null;
-    let monthlyConsumptionChart = null;
-    let optimizationChart = null;
-
+    let energyChartInstance = null;
+    let socChartInstance = null;
+    let monthlyConsumptionChartInstance = null;
+    let optimizationChartInstance = null;
+    let pvgisMonthlyChartInstance = null;
+    let pvgisUnscaledData = null; // Cache for the originally uploaded PVGIS data.
 
     // --- INITIALIZATION --- //
 
@@ -66,8 +67,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Strategy radio buttons
         document.querySelectorAll('input[name="strategy"]').forEach(radio => {
-            radio.addEventListener('change', updateFinancialsUI);
+            radio.addEventListener('change', handleStrategyChange);
         });
+
+        // Data source radio buttons
+        document.querySelectorAll('input[name="dataSource"]').forEach(radio => {
+            radio.addEventListener('change', handleDataSourceChange);
+        });
+
+        // Safeguard: Only add listeners for PVGIS elements if they exist in the DOM.
+        // This prevents errors if the script loads before the HTML is fully parsed.
+        const pvgisFileEl = document.getElementById('pvgisFile');
+        if (pvgisFileEl) {
+            pvgisFileEl.addEventListener('change', handlePvgisFileChange);
+        }
+        const pvgisScalingFactorEl = document.getElementById('pvgisScalingFactor');
+        if (pvgisScalingFactorEl) {
+            pvgisScalingFactorEl.addEventListener('input', updatePvgisDisplay);
+        }
 
         // Tariff type radio buttons (Flat vs Hourly)
         document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
@@ -85,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    
+
     // --- UI & EVENT HANDLERS --- //
 
     /**
@@ -121,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Manages the "Force Charge" column and related warnings.
      */
     function updateFinancialsUI() {
-        const strategy = document.querySelector('input[name="strategy"]:checked').value;
+        const strategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         const isExportMaximiser = strategy === 'export-maximiser';
 
         // Toggle visibility of the "Force Charge" column in tariff tables
@@ -148,6 +165,113 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Handles the strategy change event, updating the UI and refreshing the daily view if applicable.
+     */
+    function handleStrategyChange() {
+        updateFinancialsUI();
+
+        if (simulationResults.selfConsumption) {
+            const monthSelector = document.getElementById('monthSelector');
+            // Re-trigger the day selector update to refresh all daily charts and summaries
+            if (monthSelector.value)
+                updateDaySelector(monthSelector.value);
+        }
+    }
+
+    /**
+     * Handles showing or hiding the PVGIS simulation options based on user selection.
+     * @param {Event} e - The change event object.
+     */
+    function handleDataSourceChange(e) {
+        const pvgisOptions = document.getElementById('pvgis-options');
+        if (e.target.value === 'pvgis') {
+            pvgisOptions.classList.remove('hidden');
+        } else {
+            pvgisOptions.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Handles the PVGIS file input change event to parse the file and display a summary.
+     * @param {Event} e The file input change event.
+     */
+    async function handlePvgisFileChange(e) {
+        const file = e.target.files[0];
+        const summaryContainer = document.getElementById('pvgis-summary');
+        const summaryMetricsEl = document.getElementById('pvgis-summary-metrics');
+
+        // Safeguard: If the necessary UI elements don't exist, we can't proceed.
+        if (!summaryContainer || !summaryMetricsEl) {
+            console.error("PVGIS summary UI elements are missing from the DOM.");
+            return;
+        }
+
+        pvgisUnscaledData = null; // Clear cache on new file selection
+
+        if (!file) {
+            summaryContainer.classList.add('hidden');
+            return;
+        }
+
+        // Clear previous summary and show loading state
+        document.getElementById('pvgisScalingFactor').value = 1; // Reset scaler to 1
+
+        summaryMetricsEl.innerHTML = '<p>Parsing file...</p>';
+        summaryContainer.classList.remove('hidden');
+        if (pvgisMonthlyChartInstance) pvgisMonthlyChartInstance.destroy();
+
+        try {
+            const csvText = await file.text();
+            pvgisUnscaledData = parsePvgisCsv(csvText);
+            if (pvgisUnscaledData.data.length === 0) throw new Error("No data found in PVGIS file.");
+
+            updatePvgisDisplay(); // Perform the initial display
+
+        } catch (error) {
+            console.error("Error parsing PVGIS file:", error);
+            summaryMetricsEl.innerHTML = `<p class="text-red-500 font-semibold">Error: ${error.message}</p>`;
+            if (pvgisMonthlyChartInstance) pvgisMonthlyChartInstance.destroy();
+        }
+    }
+
+    /**
+     * Updates the PVGIS summary display based on the cached data and the current scaling factor.
+     */
+    function updatePvgisDisplay() {
+        if (!pvgisUnscaledData) return;
+
+        const summaryMetricsEl = document.getElementById('pvgis-summary-metrics');
+        const scalingFactor = parseFloat(document.getElementById('pvgisScalingFactor').value) || 1;
+
+        // Create a scaled copy of the data for the summary
+        const scaledData = pvgisUnscaledData.data.map(d => ({ ...d, P: d.P * scalingFactor }));
+        const metadata = pvgisUnscaledData.metadata;
+
+        const summary = calculatePvgisSummary(scaledData);
+
+        // Populate metrics
+        let specifiedPowerHtml = '';
+        if (metadata.specifiedPeakPower) {
+            // The specified power from the file is NOT scaled, which is useful for comparison.
+            specifiedPowerHtml = `<p><strong>Specified System Size (in file):</strong> ${metadata.specifiedPeakPower.toFixed(2)} kWp</p>`;
+        }
+        let yearInfoHtml = '';
+        if (summary.isMultiYear) {
+            yearInfoHtml = `<p class="text-indigo-600"><strong>Data Year Displayed:</strong> ${summary.yearUsed} (latest from multi-year file)</p>`;
+        }
+
+        summaryMetricsEl.innerHTML = `
+            ${specifiedPowerHtml}
+            <p><strong>Peak Power Output (Scaled):</strong> ${summary.peakPower.toFixed(2)} kW</p>
+            <p><strong>Total Annual Generation (Scaled):</strong> ${summary.totalAnnualGeneration.toFixed(0)} kWh</p>
+            ${yearInfoHtml}
+        `;
+
+        // Generate chart
+        generatePvgisMonthlyChart(summary.monthlyGeneration);
+        lucide.createIcons(); // Re-render any icons if needed
+    }
+    /**
      * Handles the change event for tariff type radio buttons (flat vs. hourly).
      * @param {Event} e - The change event object.
      */
@@ -157,7 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById(`${type}FlatRateSection`).classList.toggle('hidden', isHourly);
         document.getElementById(`${type}HourlyRateSection`).classList.toggle('hidden', !isHourly);
     }
-    
     /**
      * Handles the click event to show/hide tooltips.
      * @param {Event} e - The click event object.
@@ -291,6 +414,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     /**
+     * Parses the text content of a PVGIS hourly data CSV.
+     * @param {string} csvText - The raw text from the PVGIS CSV file.
+     * @returns {Object} An object containing the data array and metadata.
+     */
+    function parsePvgisCsv(csvText) {
+        const lines = csvText.trim().split('\n');
+        let dataStartIndex = -1;
+        let headers = [];
+        const metadata = {
+            specifiedPeakPower: null
+        };
+
+        // Find metadata and the start of the data.
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Look for metadata line like: # lat=..., lon=..., peakpower=10, ...
+            if (line.startsWith('#') && line.includes('peakpower=')) {
+                const match = line.match(/peakpower=([0-9.]+)/);
+                if (match && match[1]) {
+                    metadata.specifiedPeakPower = parseFloat(match[1]);
+                }
+            }
+
+            if (line.toLowerCase().startsWith('time,p,')) {
+                dataStartIndex = i + 1;
+                headers = line.split(',').map(h => h.trim());
+                break; // Stop searching once we find the data header
+            }
+        }
+
+        if (dataStartIndex === -1) {
+            throw new Error('Could not find a valid data header row in the PVGIS file. Expected a line starting with "time,P,...".');
+        }
+
+        const pIndex = headers.findIndex(h => h === 'P');
+        if (pIndex === -1) throw new Error('PVGIS file is missing the required "P" (power) column.');
+
+        const pvgisData = [];
+        for (let i = dataStartIndex; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            pvgisData.push({ time: values[0], P: parseFloat(values[pIndex]) });
+        }
+        return { data: pvgisData, metadata: metadata };
+    }
+
+    /**
+     * Calculates summary metrics from raw PVGIS data.
+     * @param {Array<Object>} rawPvgisData - The raw data from `parsePvgisCsv`.
+     * @returns {Object} An object with monthly generation, total generation, and peak power.
+     */
+    function calculatePvgisSummary(rawPvgisData) {
+        // Find the most recent year in the dataset and check for multiple years
+        let latestYear = 0;
+        const allYears = new Set();
+        rawPvgisData.forEach(d => {
+            const year = parseInt(d.time.substring(0, 4), 10);
+            allYears.add(year);
+            if (year > latestYear) {
+                latestYear = year;
+            }
+        });
+
+        // Filter the data to only include the most recent year for the summary
+        const singleYearData = rawPvgisData.filter(d => {
+            const year = parseInt(d.time.substring(0, 4), 10);
+            return year === latestYear;
+        });
+
+        const monthlyGeneration = Array(12).fill(0);
+        let totalAnnualGeneration = 0;
+        let peakPower = 0;
+
+        // Use the single-year data for transformation and calculation
+        const transformedData = transformPvgisData(singleYearData);
+
+        transformedData.forEach(d => {
+            const monthIndex = d.timestamp.getUTCMonth(); // 0-11
+            monthlyGeneration[monthIndex] += d.generation;
+            totalAnnualGeneration += d.generation;
+        });
+
+        // Find peak power from the single-year data as well for consistency
+        singleYearData.forEach(d => {
+            if (d.P > peakPower) peakPower = d.P;
+        });
+
+        return { monthlyGeneration, totalAnnualGeneration, peakPower: peakPower / 1000, yearUsed: latestYear, isMultiYear: allYears.size > 1 };
+    }
+
+    /**
      * Filters the parsed data to include only the last 12 full calendar months.
      * This ensures that annual calculations are based on a complete year of data.
      * @param {Array<Object>} data - The full array of parsed data.
@@ -320,6 +533,15 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 
+    /**
+     * Checks if a given year is a leap year.
+     * @param {number} year The year to check.
+     * @returns {boolean} True if it's a leap year.
+     */
+    function isLeapYear(year) {
+        return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    }
+
 
     // --- SIMULATION CORE --- //
 
@@ -327,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Orchestrates the entire simulation process from file reading to displaying results.
      */
     async function runFullSimulation() {
-        if (isSimulating) return;
+        if (isSimulating) { return; }
 
         const params = getSimulationParameters();
         
@@ -347,11 +569,46 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatus('Reading and parsing your HDF data file...', 'loading');
             await yieldToBrowser();
 
-            const fileText = await file.text();
-            let parsedData = parseHDF(fileText);
-            if (parsedData.length === 0) throw new Error('No valid data rows were parsed from the HDF file. Please check the file format.');
-            
-            fullData = filterLast12FullMonths(parsedData);
+            if (params.dataSource === 'pvgis') {
+                const pvgisFile = document.getElementById('pvgisFile').files[0];
+                if (!pvgisFile) throw new Error('Please select a PVGIS CSV file.');
+
+                setStatus('Reading and parsing your PVGIS data file...', 'loading');
+                await yieldToBrowser();
+
+                // First, parse the HDF to get the consumption data and the target year
+                const fileText = await file.text();
+                let parsedData = parseHDF(fileText);
+                if (parsedData.length === 0) throw new Error('No valid data rows were parsed from the HDF file. Please check the file format.');
+
+                const lastDataPoint = parsedData[parsedData.length - 1];
+                const dataYear = lastDataPoint?.timestamp.getUTCFullYear();
+                if (!dataYear) throw new Error("Could not determine the year from your HDF data.");
+
+                // Now, parse the uploaded PVGIS file
+                const pvgisText = await pvgisFile.text();
+                const pvgisResult = parsePvgisCsv(pvgisText); // This is the unscaled data
+
+                // Get the scaling factor from the UI
+                const scalingFactor = parseFloat(document.getElementById('pvgisScalingFactor').value) || 1;
+                // Create a scaled copy of the data for the simulation
+                const rawPvgisData = pvgisResult.data.map(d => ({ ...d, P: d.P * scalingFactor }));
+                
+                // Transform the PVGIS data using its own timestamps. The year-agnostic merge will happen later.
+                const transformedPvgisData = transformPvgisData(rawPvgisData);
+
+                parsedData = mergePvgisData(parsedData, transformedPvgisData);
+                setStatus('PVGIS data merged. Filtering data...', 'loading');
+                await yieldToBrowser();
+                fullData = filterLast12FullMonths(parsedData);
+            } else {
+                // If not using PVGIS, just parse the HDF as normal
+                const fileText = await file.text();
+                let parsedData = parseHDF(fileText);
+                if (parsedData.length === 0) throw new Error('No valid data rows were parsed from the HDF file. Please check the file format.');
+                fullData = filterLast12FullMonths(parsedData);
+            }
+
             if (fullData.length === 0) throw new Error('No data found within the last 12 full months. Please ensure your file contains a recent and complete year of data.');
 
             const uniqueMonths = new Set(fullData.map(d => d.timestamp.toISOString().slice(0, 7))).size;
@@ -362,14 +619,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await yieldToBrowser();
 
-            // Run main simulation for user's selected parameters
-            simulationResults = await runSimulation(fullData, params);
-            updateUIWithResults(); // Display primary results immediately
+            // --- Run Both Simulations for Comparison ---
+            setStatus('Running Self-Consumption simulation...', 'loading');
+            await yieldToBrowser();
+            const paramsSC = { ...params, strategy: 'self-consumption' };
+            const resultsSC = await runSimulation(fullData, paramsSC);
+
+            setStatus('Running Export Maximiser simulation...', 'loading');
+            await yieldToBrowser();
+            const paramsEM = { ...params, strategy: 'export-maximiser' };
+            const resultsEM = await runSimulation(fullData, paramsEM);
+
+            simulationResults = {
+                selfConsumption: resultsSC,
+                exportMaximiser: resultsEM
+            };
+            updateUIWithResults();
 
             // Run optimization analysis for different battery sizes
             setStatus('Running optimization analysis for different battery sizes...', 'loading');
             await yieldToBrowser();
-            const optimizationData = await runOptimizationAnalysis(fullData, params);
+            const optimizationData = await runOptimizationAnalysis(fullData, params); // Use user's selected params for this
             generateOptimizationChart(optimizationData, params.batteryCapacity);
 
             setStatus('Simulation and analysis complete! Results are shown below.', 'success');
@@ -400,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roundtripEfficiency: parseFloat(document.getElementById('roundtripEfficiency').value) / 100,
             systemCost: parseFloat(document.getElementById('systemCost').value),
             strategy: document.querySelector('input[name="strategy"]:checked').value,
+            dataSource: document.querySelector('input[name="dataSource"]:checked').value,
             mic: parseFloat(document.getElementById('mic').value),
             mec: parseFloat(document.getElementById('mec').value),
             importPrices: [],
@@ -418,6 +689,70 @@ document.addEventListener('DOMContentLoaded', () => {
         return params;
     }
 
+    /**
+     * Transforms raw hourly PVGIS data into 30-minute interval data.
+     * @param {Array<Object>} hourlyData - The raw hourly data from the PVGIS CSV.
+     * @returns {Array<Object>} An array of transformed data points with 30-minute intervals.
+     */
+    function transformPvgisData(hourlyData) {
+        const pvgisData = [];
+        hourlyData.forEach(item => {
+            const timeStr = item.time; // Format: "20230101:0010"
+            const pvgisYear = parseInt(timeStr.substring(0, 4), 10);
+            const month = parseInt(timeStr.substring(4, 6), 10) - 1;
+            const day = parseInt(timeStr.substring(6, 8), 10);
+            const hour = parseInt(timeStr.substring(9, 11), 10);
+
+            const powerInWatts = item.P;
+            // PVGIS gives average power (W) over the hour. To get energy (kWh) for 30 mins,
+            // we multiply by 0.5 hours and divide by 1000.
+            const energyInKwh_30min = (powerInWatts * HOURS_PER_INTERVAL) / 1000;
+
+            // Create two 30-minute intervals for each hour, using the year from the PVGIS data itself.
+            const firstIntervalTs = new Date(Date.UTC(pvgisYear, month, day, hour, 0, 0));
+            const secondIntervalTs = new Date(Date.UTC(pvgisYear, month, day, hour, 30, 0));
+
+            // A safeguard against invalid dates that could be created from malformed CSV data.
+            if (isNaN(firstIntervalTs.getTime())) return;
+
+            pvgisData.push({ timestamp: firstIntervalTs, generation: energyInKwh_30min });
+            pvgisData.push({ timestamp: secondIntervalTs, generation: energyInKwh_30min });
+        });
+        return pvgisData;
+    }
+
+    /**
+     * Merges simulated PVGIS generation data with the user's consumption data.
+     * @param {Array<Object>} consumptionData - The user's data parsed from HDF.
+     * @param {Array<Object>} generationData - The simulated data from PVGIS.
+     * @returns {Array<Object>} The merged dataset.
+     */
+    function mergePvgisData(consumptionData, generationData) {
+        // Helper to create a year-agnostic key (e.g., "02-29T14:30") from a Date object.
+        const getMonthDayTimeKey = (date) => {
+            const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+            const day = date.getUTCDate().toString().padStart(2, '0');
+            const hours = date.getUTCHours().toString().padStart(2, '0');
+            const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+            return `${month}-${day}T${hours}:${minutes}`;
+        };
+
+        const genMap = new Map(generationData.map(d => [getMonthDayTimeKey(d.timestamp), d.generation]));
+
+        return consumptionData.map(row => {
+            const key = getMonthDayTimeKey(row.timestamp);
+            let newGeneration = genMap.get(key) || 0;
+
+            // Special handling for leap day (Feb 29). If the consumption data has a Feb 29
+            // but the generation data (from a non-leap year) does not, use Feb 28 data as a fallback.
+            if (newGeneration === 0 && key.startsWith('02-29')) {
+                const fallbackKey = key.replace('02-29', '02-28');
+                newGeneration = genMap.get(fallbackKey) || 0;
+            }
+
+            return { ...row, generation: newGeneration };
+        });
+    }
     /**
      * The core simulation engine that processes the data step-by-step.
      * @param {Array<Object>} data - The time-series data to simulate over.
@@ -694,17 +1029,38 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resultsPanel').classList.remove('hidden'); 
         document.getElementById('optimizationChartContainer').classList.remove('hidden');
         
-        // --- Formatters ---
         const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value); 
         const formatKWh = (value) => `${value.toFixed(0)} kWh`;
+        const formatYears = (value) => isFinite(value) ? `${value.toFixed(1)} years` : 'Never';
+        const formatPercent = (value) => `${value.toFixed(1)}%`;
 
-        // --- Populate Summary Cards ---
-        document.getElementById('annualImportAfter').textContent = formatKWh(simulationResults.annualImportAfter);
-        document.getElementById('annualExportAfter').textContent = formatKWh(simulationResults.annualExportAfter);
-        document.getElementById('annualBillAfter').textContent = formatCurrency(simulationResults.annualBillAfter);
-        document.getElementById('annualSavings').textContent = formatCurrency(simulationResults.annualSavings); 
-        document.getElementById('paybackPeriod').textContent = isFinite(simulationResults.paybackPeriod) ? `${simulationResults.paybackPeriod.toFixed(1)} years` : 'Never'; 
-        document.getElementById('selfSufficiency').textContent = `${simulationResults.selfSufficiency.toFixed(1)}%`;
+        const resultsSC = simulationResults.selfConsumption;
+        const resultsEM = simulationResults.exportMaximiser;
+        const tableBody = document.getElementById('comparisonTableBody');
+
+        const createRow = (metric, valueSC, valueEM, formatter) => {
+            // For payback, bill, import, lower is better. For others, higher is better.
+            const isLowerBetter = metric.toLowerCase().includes('payback') || metric.toLowerCase().includes('bill') || metric.toLowerCase().includes('import');
+            let isBetterSC = isLowerBetter ? parseFloat(valueSC) < parseFloat(valueEM) : parseFloat(valueSC) > parseFloat(valueEM);
+            let isBetterEM = isLowerBetter ? parseFloat(valueEM) < parseFloat(valueSC) : parseFloat(valueEM) > parseFloat(valueSC);
+
+            return `
+                <tr class="text-center">
+                    <td class="p-3 text-left font-medium text-gray-700">${metric}</td>
+                    <td class="p-3 font-mono ${isBetterSC ? 'text-green-600 font-bold' : ''}">${formatter(valueSC)}</td>
+                    <td class="p-3 font-mono ${isBetterEM ? 'text-green-600 font-bold' : ''}">${formatter(valueEM)}</td>
+                </tr>
+            `;
+        };
+
+        tableBody.innerHTML = `
+            ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, formatCurrency)}
+            ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, formatYears)}
+            ${createRow('Self-Sufficiency', resultsSC.selfSufficiency, resultsEM.selfSufficiency, formatPercent)}
+            ${createRow('Annual Bill (After)', resultsSC.annualBillAfter, resultsEM.annualBillAfter, formatCurrency)}
+            ${createRow('Annual Import', resultsSC.annualImportAfter, resultsEM.annualImportAfter, formatKWh)}
+            ${createRow('Annual Export', resultsSC.annualExportAfter, resultsEM.annualExportAfter, formatKWh)}
+        `;
         
         // --- Generate Charts & Selectors ---
         generateBeforeSummary();
@@ -712,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const monthSelector = document.getElementById('monthSelector'); 
         monthSelector.innerHTML = ''; 
-        const monthKeys = Object.keys(simulationResults.monthlyData).sort(); 
+        const monthKeys = Object.keys(resultsSC.monthlyData).sort(); // Use one of the results to get keys
         
         monthKeys.forEach(key => { 
             const option = document.createElement('option'); 
@@ -764,10 +1120,17 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {string} monthKey - The selected month key (e.g., "2023-04").
      */
     function updateDaySelector(monthKey) {
+        if (!simulationResults.selfConsumption) return; // Guard against running before simulation
+
         const daySelector = document.getElementById('daySelector');
         daySelector.innerHTML = '';
         
-        const daysInMonth = simulationResults.detailedLog
+        const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
+        const detailedLogForStrategy = selectedStrategy === 'export-maximiser' 
+            ? simulationResults.exportMaximiser.detailedLog 
+            : simulationResults.selfConsumption.detailedLog;
+        
+        const daysInMonth = detailedLogForStrategy
             .filter(log => log.timestamp.toISOString().startsWith(monthKey))
             .map(log => log.timestamp.toISOString().slice(0, 10));
         
@@ -794,7 +1157,14 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {string} monthKey - The selected month key (e.g., "2023-04").
      */
     function updateMonthlySummary(monthKey) { 
-        const monthSummary = simulationResults.monthlyData[monthKey]; 
+        if (!simulationResults.selfConsumption) return; // Guard against running before simulation
+
+        const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
+        const resultsForStrategy = selectedStrategy === 'export-maximiser' 
+            ? simulationResults.exportMaximiser
+            : simulationResults.selfConsumption;
+        
+        const monthSummary = resultsForStrategy.monthlyData[monthKey]; 
         if (!monthSummary) return; 
         
         const [year, month] = monthKey.split('-'); 
@@ -818,7 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>
         `;
 
-        if (getSimulationParameters().strategy === 'export-maximiser' && monthSummary.missedFullCharges > 0) {
+        if (selectedStrategy === 'export-maximiser' && monthSummary.missedFullCharges > 0) {
             summaryHTML += `<li class="border-t border-gray-200 my-2"></li><li class="flex justify-between text-yellow-500" title="The battery did not reach its target SoC on these days during the Force Charge window, likely due to grid import (MIC) or charge rate limits."><span>Missed Full Charges:</span><span class="font-mono font-bold">${monthSummary.missedFullCharges} days</span></li>`;
         }
         document.getElementById('monthlySummaryList').innerHTML = summaryHTML;
@@ -829,10 +1199,15 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {string} dayStr - The selected day string (e.g., "2023-04-15").
      */
     function updateDailyView(dayStr) { 
-        if (!dayStr || !simulationResults.detailedLog) return; 
+        if (!dayStr || !simulationResults.selfConsumption) return; 
         
         const params = getSimulationParameters();
-        const dayData = simulationResults.detailedLog.filter(log => log.timestamp.toISOString().startsWith(dayStr)); 
+        const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
+        const detailedLogForStrategy = selectedStrategy === 'export-maximiser' 
+            ? simulationResults.exportMaximiser.detailedLog 
+            : simulationResults.selfConsumption.detailedLog;
+
+        const dayData = detailedLogForStrategy.filter(log => log.timestamp.toISOString().startsWith(dayStr)); 
         if (dayData.length === 0) return; 
 
         document.getElementById('chartDate').textContent = new Date(dayStr + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); 
@@ -845,14 +1220,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }; 
         
         // Destroy old charts before creating new ones to prevent memory leaks
-        if (energyChart) energyChart.destroy(); 
-        if (socChart) socChart.destroy();
+        if (energyChartInstance) energyChartInstance.destroy(); 
+        if (socChartInstance) socChartInstance.destroy();
 
         const energyCtx = document.getElementById('energyChart').getContext('2d'); 
-        energyChart = new Chart(energyCtx, getEnergyChartConfig(chartSeries)); 
+        energyChartInstance = new Chart(energyCtx, getEnergyChartConfig(chartSeries)); 
         
         const socCtx = document.getElementById('socChart').getContext('2d');
-        socChart = new Chart(socCtx, getSoCChartConfig(chartSeries));
+        socChartInstance = new Chart(socCtx, getSoCChartConfig(chartSeries));
 
         // Update navigation button states
         const daySelector = document.getElementById('daySelector'); 
@@ -869,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {number} userSelectedSize - The battery size the user originally selected.
      */
     function generateOptimizationChart(optimizationData, userSelectedSize) {
-        if (optimizationChart) optimizationChart.destroy();
+        if (optimizationChartInstance) optimizationChartInstance.destroy();
         const ctx = document.getElementById('optimizationChart').getContext('2d');
 
         // Highlight the data point for the user's currently selected size
@@ -879,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const chartOptions = getBaseChartOptions('Annual Savings (€)', false);
         chartOptions.scales.x.title = { display: true, text: 'Battery Size (kWh)', color: '#4b5563' };
 
-        optimizationChart = new Chart(ctx, {
+        optimizationChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: optimizationData.map(d => d.size),
@@ -901,17 +1276,17 @@ document.addEventListener('DOMContentLoaded', () => {
      * Generates the monthly consumption bar chart.
      */
     function generateMonthlyConsumptionChart() {
-        if (monthlyConsumptionChart) monthlyConsumptionChart.destroy();
+        if (monthlyConsumptionChartInstance) monthlyConsumptionChartInstance.destroy();
         const ctx = document.getElementById('monthlyConsumptionChart').getContext('2d');
-        
-        const sortedKeys = Object.keys(simulationResults.monthlyData).sort();
+
+        const sortedKeys = Object.keys(simulationResults.selfConsumption.monthlyData).sort();
         const monthLabels = sortedKeys.map(key => {
             const [year, month] = key.split('-');
             return new Date(year, month-1).toLocaleString('default', { month: 'short' });
         });
-        const monthData = sortedKeys.map(key => simulationResults.monthlyData[key].consumption);
+        const monthData = sortedKeys.map(key => simulationResults.selfConsumption.monthlyData[key].consumption);
 
-        monthlyConsumptionChart = new Chart(ctx, {
+        monthlyConsumptionChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: monthLabels,
@@ -924,6 +1299,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }]
             },
             options: getBaseChartOptions('Monthly Consumption (kWh)', false)
+        });
+    }
+    
+    /**
+     * Generates the monthly PVGIS generation bar chart.
+     * @param {Array<number>} monthlyData - An array of 12 numbers representing monthly generation.
+     */
+    function generatePvgisMonthlyChart(monthlyData) {
+        if (pvgisMonthlyChartInstance) pvgisMonthlyChartInstance.destroy();
+        const ctx = document.getElementById('pvgisMonthlyChart').getContext('2d');
+
+        const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        const chartOptions = getBaseChartOptions('PV Generation (kWh)', false);
+        chartOptions.scales.y.beginAtZero = true;
+
+        pvgisMonthlyChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: monthLabels,
+                datasets: [{
+                    label: 'Monthly Generation (kWh)',
+                    data: monthlyData,
+                    backgroundColor: 'rgba(245, 158, 11, 0.6)', // Amber color
+                    borderColor: 'rgba(245, 158, 11, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: chartOptions
         });
     }
 
