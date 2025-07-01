@@ -81,10 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pvgisFileEl) {
             pvgisFileEl.addEventListener('change', handlePvgisFileChange);
         }
-        const pvgisScalingFactorEl = document.getElementById('pvgisScalingFactor');
-        if (pvgisScalingFactorEl) {
-            pvgisScalingFactorEl.addEventListener('input', updatePvgisDisplay);
-        }
 
         // Tariff type radio buttons (Flat vs Hourly)
         document.querySelectorAll('input[name="importTariffType"], input[name="exportTariffType"]').forEach(radio => {
@@ -213,9 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Clear previous summary and show loading state
-        document.getElementById('pvgisScalingFactor').value = 1; // Reset scaler to 1
-
         summaryMetricsEl.innerHTML = '<p>Parsing file...</p>';
         summaryContainer.classList.remove('hidden');
         if (pvgisMonthlyChartInstance) pvgisMonthlyChartInstance.destroy();
@@ -241,13 +234,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!pvgisUnscaledData) return;
 
         const summaryMetricsEl = document.getElementById('pvgis-summary-metrics');
-        const scalingFactor = parseFloat(document.getElementById('pvgisScalingFactor').value) || 1;
 
-        // Create a scaled copy of the data for the summary
-        const scaledData = pvgisUnscaledData.data.map(d => ({ ...d, P: d.P * scalingFactor }));
+        // The data is now used directly without scaling.
+        const dataForSummary = pvgisUnscaledData.data;
         const metadata = pvgisUnscaledData.metadata;
 
-        const summary = calculatePvgisSummary(scaledData);
+        const summary = calculatePvgisSummary(dataForSummary);
 
         // Populate metrics
         let specifiedPowerHtml = '';
@@ -262,8 +254,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         summaryMetricsEl.innerHTML = `
             ${specifiedPowerHtml}
-            <p><strong>Peak Power Output (Scaled):</strong> ${summary.peakPower.toFixed(2)} kW</p>
-            <p><strong>Total Annual Generation (Scaled):</strong> ${summary.totalAnnualGeneration.toFixed(0)} kWh</p>
+            <p><strong>Peak Power Output:</strong> ${summary.peakPower.toFixed(2)} kW</p>
+            <p><strong>Total Annual Generation:</strong> ${summary.totalAnnualGeneration.toFixed(0)} kWh</p>
             ${yearInfoHtml}
         `;
 
@@ -552,9 +544,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isSimulating) { return; }
 
         const params = getSimulationParameters();
+        const hasForceChargeHours = params.forceChargeHours.some(h => h === true);
         
         // Validation check for Export Maximiser strategy
-        if (params.strategy === 'export-maximiser' && !params.forceChargeHours.some(h => h === true)) {
+        if (params.strategy === 'export-maximiser' && !hasForceChargeHours) {
             setStatus('Error: For the Export Maximiser strategy, you must select at least one hour for Force Charging.', 'error');
             return;
         }
@@ -589,10 +582,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pvgisText = await pvgisFile.text();
                 const pvgisResult = parsePvgisCsv(pvgisText); // This is the unscaled data
 
-                // Get the scaling factor from the UI
-                const scalingFactor = parseFloat(document.getElementById('pvgisScalingFactor').value) || 1;
-                // Create a scaled copy of the data for the simulation
-                const rawPvgisData = pvgisResult.data.map(d => ({ ...d, P: d.P * scalingFactor }));
+                // The data is used directly without scaling.
+                const rawPvgisData = pvgisResult.data;
                 
                 // Transform the PVGIS data using its own timestamps. The year-agnostic merge will happen later.
                 const transformedPvgisData = transformPvgisData(rawPvgisData);
@@ -634,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selfConsumption: resultsSC,
                 exportMaximiser: resultsEM
             };
-            updateUIWithResults();
+            updateUIWithResults(hasForceChargeHours);
 
             // Run optimization analysis for different battery sizes
             setStatus('Running optimization analysis for different battery sizes...', 'loading');
@@ -1001,21 +992,32 @@ document.addEventListener('DOMContentLoaded', () => {
             sizesToTest.sort((a, b) => a - b);
         }
 
-        const results = [];
-        for (const size of sizesToTest) {
-            const testParams = { ...baseParams };
-            testParams.batteryCapacity = size;
-            // Recalculate usable capacity based on the new size and the user's % setting
-            testParams.usableCapacity = size * (parseFloat(document.getElementById('usableCapacity').value) / 100);
+        const selfConsumptionResults = [];
+        const exportMaximiserResults = [];
 
-            // We don't need the detailed log for this, so we can run a slightly faster version
-            const result = await runSimulation(data, testParams);
-            results.push({
+        for (const size of sizesToTest) {
+            // Common parameters for this size
+            const commonParams = { ...baseParams };
+            commonParams.batteryCapacity = size;
+            commonParams.usableCapacity = size * (parseFloat(document.getElementById('usableCapacity').value) / 100);
+
+            // Run for Self-Consumption
+            const paramsSC = { ...commonParams, strategy: 'self-consumption' };
+            const resultSC = await runSimulation(data, paramsSC);
+            selfConsumptionResults.push({
                 size: size,
-                savings: result.annualSavings
+                savings: resultSC.annualSavings
+            });
+
+            // Run for Export Maximiser
+            const paramsEM = { ...commonParams, strategy: 'export-maximiser' };
+            const resultEM = await runSimulation(data, paramsEM);
+            exportMaximiserResults.push({
+                size: size,
+                savings: resultEM.annualSavings
             });
         }
-        return results;
+        return { selfConsumptionResults, exportMaximiserResults, sizes: sizesToTest };
     }
 
 
@@ -1024,11 +1026,22 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Updates the entire UI with the simulation results.
      */
-    function updateUIWithResults() { 
+    function updateUIWithResults(hasForceChargeHours) { 
         document.getElementById('welcomePanel').classList.add('hidden'); 
         document.getElementById('resultsPanel').classList.remove('hidden'); 
         document.getElementById('optimizationChartContainer').classList.remove('hidden');
         
+        // Show a warning if the Export Maximiser results were generated without any force-charge hours selected.
+        const warningEl = document.getElementById('comparisonWarning');
+        if (warningEl) {
+            if (!hasForceChargeHours) {
+                warningEl.innerHTML = '<p class="font-bold">Note on "Export Maximiser" Results</p><p>No force-charge hours were selected. The results for this strategy are therefore not representative of its potential. To see an accurate comparison, select your cheap-rate hours in the hourly import tariff table and run the simulation again.</p>';
+                warningEl.classList.remove('hidden');
+            } else {
+                warningEl.classList.add('hidden');
+            }
+        }
+
         const formatCurrency = (value) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value); 
         const formatKWh = (value) => `${value.toFixed(0)} kWh`;
         const formatYears = (value) => isFinite(value) ? `${value.toFixed(1)} years` : 'Never';
@@ -1203,6 +1216,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const params = getSimulationParameters();
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
+
+        // Update the strategy title in the daily analysis section
+        const strategyDisplayEl = document.getElementById('dailyAnalysisStrategy');
+        if (strategyDisplayEl) {
+            const formattedName = selectedStrategy === 'self-consumption' ? 'Self-Consumption' : 'Export Maximiser';
+            strategyDisplayEl.textContent = `(${formattedName})`;
+        }
+
         const detailedLogForStrategy = selectedStrategy === 'export-maximiser' 
             ? simulationResults.exportMaximiser.detailedLog 
             : simulationResults.selfConsumption.detailedLog;
@@ -1246,32 +1267,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateOptimizationChart(optimizationData, userSelectedSize) {
         if (optimizationChartInstance) optimizationChartInstance.destroy();
         const ctx = document.getElementById('optimizationChart').getContext('2d');
-
+    
+        const { selfConsumptionResults, exportMaximiserResults, sizes } = optimizationData;
+    
         // Highlight the data point for the user's currently selected size
-        const pointColors = optimizationData.map(d => d.size === userSelectedSize ? 'rgba(239, 68, 68, 1)' : 'rgba(79, 70, 229, 1)');
-        const pointRadii = optimizationData.map(d => d.size === userSelectedSize ? 6 : 3);
-
-        const chartOptions = getBaseChartOptions('Annual Savings (€)', false);
+        const pointRadii = sizes.map(size => size === userSelectedSize ? 6 : 3);
+    
+        const chartOptions = getBaseChartOptions('Annual Savings (€)', true); // Show legend
         chartOptions.scales.x.title = { display: true, text: 'Battery Size (kWh)', color: '#4b5563' };
-
+    
         optimizationChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: optimizationData.map(d => d.size),
-                datasets: [{
-                    label: 'Annual Savings (€)',
-                    data: optimizationData.map(d => d.savings),
-                    borderColor: 'rgba(79, 70, 229, 0.8)',
-                    backgroundColor: pointColors, // For points
-                    pointRadius: pointRadii,
-                    pointHoverRadius: 8,
-                    fill: false,
-                    tension: 0.1
-                }]
+                labels: sizes,
+                datasets: [
+                    {
+                        label: 'Self-Consumption',
+                        data: selfConsumptionResults.map(d => d.savings),
+                        borderColor: 'rgba(139, 92, 246, 1)', // Violet-500
+                        backgroundColor: 'rgba(139, 92, 246, 1)',
+                        pointRadius: pointRadii,
+                        pointHoverRadius: 8,
+                        fill: false,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Export Maximiser',
+                        data: exportMaximiserResults.map(d => d.savings),
+                        borderColor: 'rgba(239, 68, 68, 1)', // Red-500
+                        backgroundColor: 'rgba(239, 68, 68, 1)',
+                        pointRadius: pointRadii,
+                        pointHoverRadius: 8,
+                        fill: false,
+                        tension: 0.1
+                    }
+                ]
             },
             options: chartOptions
         });
     }
+
     /**
      * Generates the monthly consumption bar chart.
      */

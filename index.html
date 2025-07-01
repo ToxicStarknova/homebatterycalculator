@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            // Dark mode removed
+            // Tailwind config options can be added here if needed.
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,22 +15,87 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Custom styles will be added here if needed, but Tailwind's @apply is not supported by the CDN script. */
+
+        /* --- Custom Component Styles --- */
+        /* These classes complement Tailwind by creating reusable components. */
+
+        /* Form Inputs & Labels */
+        .input-group {
+            position: relative;
+        }
+        .input-label {
+            display: inline-block;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        .input-field {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
+        }
+
+        /* Info Buttons & Tooltips */
+        .info-button {
+            display: inline-flex;
+            color: #6b7280;
+            margin-left: 0.25rem;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+        .info-button:hover { color: #4f46e5; }
+        .tooltip {
+            position: absolute;
+            z-index: 10;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            color: #ffffff;
+            background-color: #1f2937;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            max-width: 250px;
+        }
+
+        /* Tariff Tables */
+        .tariff-table {
+            width: 100%;
+            font-size: 0.875rem;
+            border-collapse: collapse;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        .tariff-table th, .tariff-table td { padding: 0.5rem; text-align: left; }
+        .tariff-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+        .tariff-table tbody tr:not(:last-child) { border-bottom: 1px solid #e5e7eb; }
+        .tariff-table .rate-input { padding: 0.25rem; text-align: center; max-width: 80px; }
+        .tariff-table .force-cb-label { display: flex; justify-content: center; align-items: center; cursor: pointer; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-slate-100 text-gray-900">
 
     <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-8 relative">
-            <h1 class="text-4xl font-bold text-indigo-600">Home Battery Savings Calculator</h1>
-            <p class="mt-2 text-lg text-gray-600 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
+        <header class="text-center mb-12 relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-12 rounded-xl shadow-lg">
+            <h1 class="text-4xl font-bold">Home Battery Savings Calculator</h1>
+            <p class="mt-2 text-lg text-indigo-200 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg self-start sticky top-8">
+            <!-- Added <form> for semantic structure and to group inputs -->
+            <form id="config-form" class="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg self-start sticky top-8">
                 <h2 class="text-2xl font-semibold mb-4 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
                 
-                <button id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
+                <!-- Added type="button" to prevent form submission and page reload -->
+                <button type="button" id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
                 <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500"></p>
 
                 <!-- Section 1: HDF Upload -->
@@ -39,6 +104,7 @@
                     <div class="input-group">
                         <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
                         <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <p class="text-xs text-indigo-700 font-semibold mt-1">Important: On the ESB website, please download the file with "30-minute readings in calculated kWh".</p>
                         <p class="text-xs text-gray-500 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
                     </div>
                 </div>
@@ -69,11 +135,6 @@
                         <div class="input-group">
                             <label for="pvgisFile" class="input-label">PVGIS Hourly Data File (CSV)</label>
                             <input type="file" id="pvgisFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                        </div>
-                        <div class="input-group">
-                            <label for="pvgisScalingFactor" class="input-label">Generation Scaling Factor<button class="info-button" data-tooltip-target="tooltip-scaling-factor"><i data-lucide="info" class="h-4 w-4"></i></button></label>
-                            <input type="number" id="pvgisScalingFactor" class="input-field" value="1" min="0.1" step="0.1">
-                            <div id="tooltip-scaling-factor" role="tooltip" class="tooltip hidden">Use this to scale the generation data from your file. E.g., if you downloaded data for a 1 kWp system but want to simulate a 10 kWp system, set this to 10.</div>
                         </div>
                         <div class="text-xs text-gray-600">
                             <p class="font-semibold">How to get the file:</p>
@@ -109,7 +170,8 @@
                             <input type="number" id="batterySize" class="input-field" value="10">
                         </div>
                         <div class="input-group">
-                            <label for="usableCapacity" class="input-label">Usable Capacity (%)<button class="info-button" data-tooltip-target="tooltip-usable-capacity"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="usableCapacity" class="input-label">Usable Capacity (%)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-usable-capacity"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100">
                             <div id="tooltip-usable-capacity" role="tooltip" class="tooltip hidden">The percentage of the total battery capacity you can actually use, as limited by the manufacturer to protect the battery.</div>
                         </div>
@@ -118,27 +180,32 @@
                             <input type="number" id="chargeRate" class="input-field" value="5">
                         </div>
                         <div class="input-group">
-                            <label for="roundtripEfficiency" class="input-label">Efficiency (%)<button class="info-button" data-tooltip-target="tooltip-efficiency"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="roundtripEfficiency" class="input-label">Efficiency (%)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-efficiency"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100">
                              <div id="tooltip-efficiency" role="tooltip" class="tooltip hidden">The round-trip efficiency. Energy is lost during both charging and discharging. 90% is a typical value.</div>
                         </div>
                         <div class="input-group">
-                            <label for="mic" class="input-label">Max Import (kW)<button class="info-button" data-tooltip-target="tooltip-mic"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="mic" class="input-label">Max Import (kW)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-mic"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="mic" class="input-field" value="12">
                              <div id="tooltip-mic" role="tooltip" class="tooltip hidden">Your home's maximum import capacity from the grid, set by your provider (e.g., 12kW for standard domestic).</div>
                         </div>
                         <div class="input-group">
-                            <label for="mec" class="input-label">Max Export (kW)<button class="info-button" data-tooltip-target="tooltip-mec"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="mec" class="input-label">Max Export (kW)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-mec"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="mec" class="input-field" value="6">
                             <div id="tooltip-mec" role="tooltip" class="tooltip hidden">Your home's maximum allowed export power to the grid. Often limited by the inverter or network operator (e.g., 6kW).</div>
                         </div>
                         <div class="input-group">
-                            <label for="minSoc" class="input-label">Min SoC (%)<button class="info-button" data-tooltip-target="tooltip-min-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="minSoc" class="input-label">Min SoC (%)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-min-soc"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="minSoc" class="input-field" value="10" min="0" max="100">
                             <div id="tooltip-min-soc" role="tooltip" class="tooltip hidden">The minimum charge level you want to keep in the battery for backup or to prolong its life.</div>
                         </div>
                         <div class="input-group">
-                            <label for="maxSoc" class="input-label">Max SoC (%)<button class="info-button" data-tooltip-target="tooltip-max-soc"><i data-lucide="info" class="h-4 w-4"></i></button></label>
+                            <label for="maxSoc" class="input-label">Max SoC (%)</label>
+                            <button type="button" class="info-button" data-tooltip-target="tooltip-max-soc"><i data-lucide="info" class="h-4 w-4"></i></button>
                             <input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100">
                             <div id="tooltip-max-soc" role="tooltip" class="tooltip hidden">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
                         </div>
@@ -208,7 +275,7 @@
                           <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
                       </div>
                 </div>
-            </div>
+            </form>
 
             <div id="resultsPanel" class="lg:col-span-2 hidden">
                 <h2 class="text-3xl font-bold mb-4 text-gray-800">"Before" Scenario Summary</h2>
@@ -216,6 +283,9 @@
 
                 <h2 class="text-3xl font-bold mb-4 text-gray-800">"After" Scenario Annual Summary</h2>
                 <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
+                    <div id="comparisonWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md" role="alert">
+                        <!-- Warning text will be populated by JS -->
+                    </div>
                     <table class="w-full text-left">
                         <thead>
                             <tr class="border-b-2 border-gray-200">
@@ -234,7 +304,7 @@
                 <div id="optimizationChartContainer" class="bg-white p-6 rounded-lg shadow-lg mb-8 hidden">
                     <h3 class="text-xl font-semibold text-center mb-4">Battery Size vs. Annual Savings</h3>
                     <div class="relative h-80"><canvas id="optimizationChart"></canvas></div>
-                    <p class="text-xs text-center text-gray-500 mt-2">This chart shows the estimated annual savings for different battery sizes, helping you find the point of diminishing returns. The red dot indicates your currently selected system size.</p>
+                    <p class="text-xs text-center text-gray-500 mt-2">This chart compares the estimated annual savings for both simulation strategies across different battery sizes. The larger dots indicate your currently selected system size.</p>
                 </div>
 
                 <hr class="my-12 border-gray-300"/>
@@ -244,7 +314,10 @@
                     <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
                 </div>
                 
-                <div class="flex justify-between items-center mb-4"><h2 class="text-3xl font-bold text-gray-800">Daily Analysis</h2><button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-3xl font-bold text-gray-800">Daily Analysis <span id="dailyAnalysisStrategy" class="text-xl font-medium text-indigo-600 ml-2"></span></h2>
+                    <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button>
+                </div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white p-6 rounded-lg shadow-lg">
                     <div class="flex items-center justify-center mb-2 relative">
                         <button id="prevDayBtn" class="nav-btn absolute left-0"><i data-lucide="arrow-left" class="h-5 w-5"></i></button>
                         <h3 class="text-xl font-semibold text-center">Energy Flow for <span id="chartDate"></span></h3>
@@ -261,4 +334,3 @@
     <script src="script.js" defer></script>
 </body>
 </html>
-
