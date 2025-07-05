@@ -11,17 +11,19 @@ Features
     *   Total and Usable Capacity (kWh)
     *   Charge/Discharge Rate (kW)
     *   Round-trip Efficiency (%)
-    *   Maximum Grid Import & Export (MIC/MEC)
+    *   Maximum Grid Import & Export (MIC/MEC) limits
     *   Minimum/Maximum State of Charge (SoC)
+*   **PV System Simulation:** Allows users without existing solar data to simulate a new PV system by uploading an hourly data file from the PVGIS service. Includes a scaling factor for easy what-if analysis.
 *   **Advanced Simulation Strategies:**
     *   **Self-Consumption:** A standard strategy that prioritises storing excess solar power to be used later in the home.
     *   **Export Maximiser (Tariff Optimiser):** An advanced strategy that force-charges the battery from the grid during designated cheap-rate hours.
 *   **Flexible Tariff Options:** Supports flat-rate and hourly import/export tariffs to accurately model various energy plans.
-*   **Comprehensive Financial Analysis:** Provides clear annual summaries of:
-    *   Estimated Bill (Before & After Battery)
-    *   Total Annual Savings
-    *   System Payback Period
-    *   Self-Sufficiency Percentage
+*   **Comprehensive Financial Analysis:** Provides a clear side-by-side comparison of both simulation strategies, showing key annual metrics like:
+    *   Annual Savings
+    *   Payback Period
+    *   Self-Sufficiency
+    *   Annual Bill (Before & After)
+    *   Grid Import/Export
 *   **Interactive Data Visualisation:**
     *   Annual and monthly summary cards.
     *   Interactive daily charts showing energy flow and battery state of charge.
@@ -34,11 +36,12 @@ How to Use
 2.  **Open the Calculator:** Open the `index.html` file in any modern web browser.
 3.  **Upload Your File:** In Section 1, click "Choose file" and select the HDF file you downloaded.
 4.  **Configure Your System:**
-    *   In Section 2, enter the technical details of the battery system you are considering. Use the info icons for help on specific terms.
-    *   In Section 3, choose the simulation strategy you want to model.
-    *   In Section 4, enter the total installed cost of the system and configure your electricity import/export tariffs. If using the "Export Maximiser" strategy, be sure to select your cheap-rate hours for force-charging.
+    *   **PV Data:** If you don't have solar data, select "Simulate New PV System", download the hourly data file from the PVGIS website (instructions provided in the app), and upload it.
+    *   **Technical Details:** Enter the technical details of the battery system you are considering. Use the info icons for help on specific terms.
+    *   **Strategy:** Choose the simulation strategy you want to model.
+    *   **Financials:** Enter the total installed cost of the system and configure your electricity import/export tariffs. If using the "Export Maximiser" strategy, be sure to select your cheap-rate hours for force-charging.
 5.  **Run the Simulation:** Click the "Run Simulation" button at the top of the configuration panel.
-6.  **Analyse the Results:** Review the summary cards and interactive charts on the right-hand side to see your potential savings and energy usage patterns. Use the new "Battery Size vs. Annual Savings" chart to see which system size offers the best return on investment.
+6.  **Analyse the Results:** Review the side-by-side comparison table and interactive charts to see your potential savings and energy usage patterns. Use the "Battery Size vs. Annual Savings" chart to see which system size offers the best return on investment.
 
 Technical Details
 -----------------
@@ -51,7 +54,7 @@ Technical Details
 Future Development
 ------------------
 
-*   **PV Simulation:** The next major planned feature is to add a PV (solar panel) simulation mode. This will allow users who do not yet have solar panels to estimate their potential savings by entering their location, system size, and orientation, using the PVGIS API to generate synthetic solar data.
+*   **Save/Load Profiles:** Add the ability to save and load different configuration profiles, making it easier to compare different system setups.
 
 Disclaimer
 ----------
