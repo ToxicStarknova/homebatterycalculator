@@ -5,7 +5,11 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.0.0
+ * @version 2.1.0
+ * @changelog
+ * - v2.1.0:
+ * - (Export Maximiser) Changed pre-emptive discharge lookahead from 2 hours to 4 hours.
+ * - (Export Maximiser) Now charges battery from excess solar *unless* in a pre-charge window.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -769,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- Progress Update & Day Rollover Logic ---
             if (i > 0 && i % 1000 === 0) { 
-                setStatus(`Running simulation... (${Math.round((i/data.length)*100)}%)`, 'loading'); 
+                setStatus(`Running ${params.strategy} simulation... (${Math.round((i/data.length)*100)}%)`, 'loading'); 
                 await yieldToBrowser(); 
             }
             
@@ -847,6 +851,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const spaceInBattery = Math.max(0, maxSoC_kWh - batterySoC);
         const isForceChargeHour = params.strategy === 'export-maximiser' && params.forceChargeHours[hour];
 
+        // --- MODIFIED LOGIC (Part 2) ---
+        // Define pre-charge hour logic (4-hour window) to be used in steps 4 and 5.
+        let isPreChargeHour = false;
+        if (params.strategy === 'export-maximiser' && !isForceChargeHour) {
+            const nextHour = (hour + 1) % 24;
+            const hourAfterNext = (hour + 2) % 24;
+            const hourAfterNext2 = (hour + 3) % 24; // 3 hours ahead
+            const hourAfterNext3 = (hour + 4) % 24; // 4 hours ahead
+            isPreChargeHour = (
+                params.forceChargeHours[nextHour] || 
+                params.forceChargeHours[hourAfterNext] ||
+                params.forceChargeHours[hourAfterNext2] || // Added
+                params.forceChargeHours[hourAfterNext3] // Added
+            );
+        }
+        // --- END MODIFICATION (Part 2) ---
+
         // 1. Direct Solar Self-Consumption
         let remainingDemand = homeConsumption;
         let excessSolar = solarGeneration;
@@ -870,29 +891,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 4. Handle Excess Solar Generation
         if (excessSolar > 0) {
-            if (params.strategy === 'self-consumption') {
-                // In self-consumption, prioritize charging the battery with solar
+            // --- MODIFIED LOGIC (Part 1) ---
+            if (params.strategy === 'export-maximiser' && isPreChargeHour) {
+                // It's a pre-charge hour. Do NOT charge. Export all solar to help empty the battery.
+                gridExport += excessSolar;
+            } else {
+                // NOT a pre-charge hour OR strategy is self-consumption.
+                // Prioritize charging battery with solar. (This now applies to export-maximiser too).
                 const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * HOURS_PER_INTERVAL);
                 if (chargeFromSolar > FLOAT_TOLERANCE) {
                     batterySoC += chargeFromSolar * efficiencySqrt;
                     toBattery += chargeFromSolar;
                     gridExport += excessSolar - chargeFromSolar; // Export any solar left over
                 } else {
-                    gridExport += excessSolar; // Export all if battery is full
+                    gridExport += excessSolar; // Export all if battery is full or can't be charged
                 }
-            } else {
-                // In other strategies (like export maximiser), immediately export solar
-                gridExport += excessSolar;
             }
+            // --- END MODIFICATION (Part 1) ---
         }
 
         // 5. Handle Export Maximiser Strategy Logic
         if (params.strategy === 'export-maximiser') {
             // 5a. Pre-emptive discharge: Dump battery charge to the grid just before a force-charge window
             // to make space for cheap grid charging.
-            const nextHour = (hour + 1) % 24;
-            const hourAfterNext = (hour + 2) % 24;
-            const isPreChargeHour = !isForceChargeHour && (params.forceChargeHours[nextHour] || params.forceChargeHours[hourAfterNext]);
+            // 'isPreChargeHour' is now defined above, before step 4.
             
             if (isPreChargeHour) {
                 const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * HOURS_PER_INTERVAL);
@@ -1481,7 +1503,13 @@ document.addEventListener('DOMContentLoaded', () => {
      * Exports the detailed simulation log to a CSV file.
      */
     function exportResultsToCSV() { 
-        if (!simulationResults?.detailedLog?.length) { 
+        // Get the log for the currently selected strategy
+        const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
+        const detailedLog = (selectedStrategy === 'export-maximiser')
+            ? simulationResults.exportMaximiser?.detailedLog
+            : simulationResults.selfConsumption?.detailedLog;
+
+        if (!detailedLog || detailedLog.length === 0) { 
             setStatus("No simulation data to export. Please run a simulation first.", "warning"); 
             return; 
         } 
@@ -1489,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const headers = ["Timestamp (UTC)", "Consumption (kWh)", "Generation (kWh)", "Grid Import (kWh)", "Grid Export (kWh)", "Battery Charge (kWh)", "Battery Discharge (kWh)", "Battery SoC (kWh)"]; 
         const pad = (num) => num.toString().padStart(2, '0');
 
-        const rows = simulationResults.detailedLog.map(log => {
+        const rows = detailedLog.map(log => {
             const ts = log.timestamp;
             // Format timestamp to a more standard and sortable format
             const dateStr = `${ts.getUTCFullYear()}-${pad(ts.getUTCMonth() + 1)}-${pad(ts.getUTCDate())} ${pad(ts.getUTCHours())}:${pad(ts.getUTCMinutes())}:${pad(ts.getUTCSeconds() || '00')}`;
@@ -1510,12 +1538,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const link = document.createElement("a"); 
         
         link.setAttribute("href", URL.createObjectURL(blob)); 
-        link.setAttribute("download", "battery_simulation_export.csv"); 
+        const fileName = `battery_sim_${selectedStrategy}.csv`;
+        link.setAttribute("download", fileName); 
         link.style.visibility = 'hidden'; 
         
         document.body.appendChild(link); 
         link.click(); 
         document.body.removeChild(link); 
+
+        setStatus(`Exported ${fileName}`, 'success');
     }
 
     // --- START THE APP --- //
