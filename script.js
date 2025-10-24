@@ -5,8 +5,12 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.2.0
+ * @version 2.3.0
  * @changelog
+ * - v2.3.0:
+ * - (Feature) Added 'Import Minimiser' strategy.
+ * - (Import Minimiser) This strategy force-charges at cheap rates but never force-discharges.
+ * - (UI) All comparison views updated to support four strategies.
  * - v2.2.0:
  * - (Feature) Added 'Balanced Export Maximiser' strategy.
  * - (Balanced) This strategy disables pre-emptive discharge during heating season (Nov, Dec, Jan, Feb).
@@ -146,17 +150,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFinancialsUI() {
         const strategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        // --- MODIFIED: Check for either export strategy ---
-        const isExportStrategy = strategy === 'export-maximiser' || strategy === 'balanced-export-maximiser';
+        // --- MODIFIED: Check for any strategy that requires force charging ---
+        const requiresForceCharge = strategy === 'export-maximiser' || strategy === 'balanced-export-maximiser' || strategy === 'import-minimiser';
 
         // Toggle visibility of the "Force Charge" column in tariff tables
-        document.querySelectorAll('.force-control-col').forEach(c => c.classList.toggle('hidden', !isExportStrategy));
+        document.querySelectorAll('.force-control-col').forEach(c => c.classList.toggle('hidden', !requiresForceCharge));
         
         // Show or hide the warning message for the Export Maximiser strategy
-        document.getElementById('force-charge-warning').classList.toggle('hidden', !isExportStrategy);
+        document.getElementById('force-charge-warning').classList.toggle('hidden', !requiresForceCharge);
         
-        // For 'Export Maximiser' (or balanced), force the import tariff to be 'Hourly'
-        if (isExportStrategy) {
+        // For strategies requiring force charge, force the import tariff to be 'Hourly'
+        if (requiresForceCharge) {
             const importHourlyRadio = document.getElementById('importTariffHourly');
             if (!importHourlyRadio.checked) {
                 importHourlyRadio.checked = true;
@@ -558,9 +562,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = getSimulationParameters();
         const hasForceChargeHours = params.forceChargeHours.some(h => h === true);
         
-        // --- MODIFIED: Validation check for both export strategies ---
-        const isExportStrategy = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser';
-        if (isExportStrategy && !hasForceChargeHours) {
+        // --- MODIFIED: Validation check for all strategies requiring force charge ---
+        const requiresForceCharge = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser' || params.strategy === 'import-minimiser';
+        if (requiresForceCharge && !hasForceChargeHours) {
             setStatus(`Error: For the ${params.strategy} strategy, you must select at least one hour for Force Charging.`, 'error');
             return;
         }
@@ -623,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await yieldToBrowser();
 
-            // --- MODIFIED: Run All Three Simulations for Comparison ---
+            // --- MODIFIED: Run All Four Simulations for Comparison ---
             setStatus('Running Self-Consumption simulation...', 'loading');
             await yieldToBrowser();
             const paramsSC = { ...params, strategy: 'self-consumption' };
@@ -640,10 +644,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const paramsBEM = { ...params, strategy: 'balanced-export-maximiser' };
             const resultsBEM = await runSimulation(fullData, paramsBEM);
 
+            // --- ADDED: Run Import Minimiser Simulation ---
+            setStatus('Running Import Minimiser simulation...', 'loading');
+            await yieldToBrowser();
+            const paramsIM = { ...params, strategy: 'import-minimiser' };
+            const resultsIM = await runSimulation(fullData, paramsIM);
+
             simulationResults = {
                 selfConsumption: resultsSC,
                 exportMaximiser: resultsEM,
-                balancedExportMaximiser: resultsBEM // Added
+                balancedExportMaximiser: resultsBEM, // Added
+                importMinimiser: resultsIM // Added
             };
             // --- END MODIFICATION ---
 
@@ -873,13 +884,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const availableEnergyInBattery = Math.max(0, batterySoC - minSoC_kWh);
         const spaceInBattery = Math.max(0, maxSoC_kWh - batterySoC);
+        
+        // --- MODIFIED: Check for all relevant strategies ---
         const isExportStrategy = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser';
-        const isForceChargeHour = isExportStrategy && params.forceChargeHours[hour];
+        const isImportMinimiser = params.strategy === 'import-minimiser';
+        const isForceChargeHour = (isExportStrategy || isImportMinimiser) && params.forceChargeHours[hour];
+        // --- END MODIFIED ---
 
         // --- MODIFIED LOGIC (Part 2) ---
         // Define pre-charge hour logic (4-hour window) to be used in steps 4 and 5.
         let isPreChargeHour = false;
-        if (isExportStrategy && !isForceChargeHour) {
+        if (isExportStrategy && !isForceChargeHour) { // Note: This is intentionally !isImportMinimiser
             const nextHour = (hour + 1) % 24;
             const hourAfterNext = (hour + 2) % 24;
             const hourAfterNext2 = (hour + 3) % 24; // 3 hours ahead
@@ -921,8 +936,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // It's a pre-charge hour. Do NOT charge. Export all solar to help empty the battery.
                 gridExport += excessSolar;
             } else {
-                // NOT a pre-charge hour OR strategy is self-consumption.
-                // Prioritize charging battery with solar. (This now applies to export-maximiser too).
+                // NOT a pre-charge hour OR strategy is self-consumption OR strategy is import-minimiser
+                // Prioritize charging battery with solar.
                 const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * HOURS_PER_INTERVAL);
                 if (chargeFromSolar > FLOAT_TOLERANCE) {
                     batterySoC += chargeFromSolar * efficiencySqrt;
@@ -935,19 +950,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // --- END MODIFICATION (Part 1) ---
         }
 
-        // 5. Handle Export Maximiser Strategy Logic
-        if (isExportStrategy) {
+        // 5. Handle Force-Charge Strategy Logic
+        if (isExportStrategy || isImportMinimiser) {
             // 5a. Pre-emptive discharge: Dump battery charge to the grid just before a force-charge window
-            // to make space for cheap grid charging.
-            // 'isPreChargeHour' is now defined above, before step 4.
-            
+            // This will only run if isExportStrategy is true (and thus isPreChargeHour can be true)
             if (isPreChargeHour) {
                 
                 // --- ADDED LOGIC FOR BALANCED STRATEGY ---
                 // Check if we should skip pre-emptive discharge
-                // Skip if:
-                // 1. The strategy is 'balanced-export-maximiser' AND
-                // 2. It's the heating season (Jan, Feb, Nov, Dec)
                 const skipPreemptiveDischarge = (params.strategy === 'balanced-export-maximiser' && isHeatingSeason);
                 // --- END ADDED LOGIC ---
 
@@ -967,6 +977,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // 5b. Force Charge from Grid
+            // This will run for ALL strategies if isForceChargeHour is true
             if (isForceChargeHour) {
                 forceChargeScheduledToday = true;
                 const homeImportPower = remainingDemand / HOURS_PER_INTERVAL; // Remaining demand is now home import
@@ -1054,6 +1065,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportMaximiserResults = [];
         // --- ADDED: Array for balanced results ---
         const balancedExportMaximiserResults = [];
+        // --- ADDED: Array for import minimiser results ---
+        const importMinimiserResults = [];
 
         for (const size of sizesToTest) {
             // Common parameters for this size
@@ -1084,10 +1097,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 size: size,
                 savings: resultBEM.annualSavings
             });
+            
+            // --- ADDED: Run for Import Minimiser ---
+            const paramsIM = { ...commonParams, strategy: 'import-minimiser' };
+            const resultIM = await runSimulation(data, paramsIM);
+            importMinimiserResults.push({
+                size: size,
+                savings: resultIM.annualSavings
+            });
         }
         
-        // --- MODIFIED: Return all three results ---
-        return { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, sizes: sizesToTest };
+        // --- MODIFIED: Return all four results ---
+        return { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes: sizesToTest };
     }
 
 
@@ -1119,15 +1140,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const resultsSC = simulationResults.selfConsumption;
         const resultsEM = simulationResults.exportMaximiser;
-        // --- ADDED: Get balanced results ---
         const resultsBEM = simulationResults.balancedExportMaximiser;
+        const resultsIM = simulationResults.importMinimiser;
         const tableBody = document.getElementById('comparisonTableBody');
 
-        // --- MODIFIED: createRow now accepts 3 values and finds the best ---
-        const createRow = (metric, valueSC, valueEM, valueBEM, formatter) => {
+        // --- MODIFIED: createRow now accepts 4 values and finds the best ---
+        const createRow = (metric, valueSC, valueEM, valueBEM, valueIM, formatter) => {
             // For payback, bill, import, lower is better. For others, higher is better.
             const isLowerBetter = metric.toLowerCase().includes('payback') || metric.toLowerCase().includes('bill') || metric.toLowerCase().includes('import');
-            const values = [parseFloat(valueSC), parseFloat(valueEM), parseFloat(valueBEM)];
+            const values = [parseFloat(valueSC), parseFloat(valueEM), parseFloat(valueBEM), parseFloat(valueIM)];
             const bestValue = isLowerBetter ? Math.min(...values) : Math.max(...values);
 
             // Check which value is the best, allowing for floating point tolerance
@@ -1136,6 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const scClass = isBest(valueSC) ? 'text-green-600 font-bold' : '';
             const emClass = isBest(valueEM) ? 'text-green-600 font-bold' : '';
             const bemClass = isBest(valueBEM) ? 'text-green-600 font-bold' : '';
+            const imClass = isBest(valueIM) ? 'text-green-600 font-bold' : '';
 
             return `
                 <tr class="text-center">
@@ -1143,18 +1165,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="p-3 font-mono ${scClass}">${formatter(valueSC)}</td>
                     <td class="p-3 font-mono ${emClass}">${formatter(valueEM)}</td>
                     <td class="p-3 font-mono ${bemClass}">${formatter(valueBEM)}</td>
+                    <td class="p-3 font-mono ${imClass}">${formatter(valueIM)}</td>
                 </tr>
             `;
         };
 
-        // --- MODIFIED: Pass all 3 values to createRow ---
+        // --- MODIFIED: Pass all 4 values to createRow ---
         tableBody.innerHTML = `
-            ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, resultsBEM.annualSavings, formatCurrency)}
-            ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, resultsBEM.paybackPeriod, formatYears)}
-            ${createRow('Self-Sufficiency', resultsSC.selfSufficiency, resultsEM.selfSufficiency, resultsBEM.selfSufficiency, formatPercent)}
-            ${createRow('Annual Bill (After)', resultsSC.annualBillAfter, resultsEM.annualBillAfter, resultsBEM.annualBillAfter, formatCurrency)}
-            ${createRow('Annual Import', resultsSC.annualImportAfter, resultsEM.annualImportAfter, resultsBEM.annualImportAfter, formatKWh)}
-            ${createRow('Annual Export', resultsSC.annualExportAfter, resultsEM.annualExportAfter, resultsBEM.annualExportAfter, formatKWh)}
+            ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, resultsBEM.annualSavings, resultsIM.annualSavings, formatCurrency)}
+            ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, resultsBEM.paybackPeriod, resultsIM.paybackPeriod, formatYears)}
+            ${createRow('Self-Sufficiency', resultsSC.selfSufficiency, resultsEM.selfSufficiency, resultsBEM.selfSufficiency, resultsIM.selfSufficiency, formatPercent)}
+            ${createRow('Annual Bill (After)', resultsSC.annualBillAfter, resultsEM.annualBillAfter, resultsBEM.annualBillAfter, resultsIM.annualBillAfter, formatCurrency)}
+            ${createRow('Annual Import', resultsSC.annualImportAfter, resultsEM.annualImportAfter, resultsBEM.annualImportAfter, resultsIM.annualImportAfter, formatKWh)}
+            ${createRow('Annual Export', resultsSC.annualExportAfter, resultsEM.annualExportAfter, resultsBEM.annualExportAfter, resultsIM.annualExportAfter, formatKWh)}
         `;
         
         // --- Generate Charts & Selectors ---
@@ -1231,6 +1254,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'balanced-export-maximiser':
                 detailedLogForStrategy = simulationResults.balancedExportMaximiser.detailedLog;
                 break;
+            case 'import-minimiser':
+                detailedLogForStrategy = simulationResults.importMinimiser.detailedLog;
+                break;
             default:
                 detailedLogForStrategy = simulationResults.selfConsumption.detailedLog;
         }
@@ -1275,6 +1301,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'balanced-export-maximiser':
                 resultsForStrategy = simulationResults.balancedExportMaximiser;
                 break;
+            case 'import-minimiser':
+                resultsForStrategy = simulationResults.importMinimiser;
+                break;
             default:
                 resultsForStrategy = simulationResults.selfConsumption;
         }
@@ -1303,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>
         `;
 
-        if ((selectedStrategy === 'export-maximiser' || selectedStrategy === 'balanced-export-maximiser') && monthSummary.missedFullCharges > 0) {
+        if ((selectedStrategy === 'export-maximiser' || selectedStrategy === 'balanced-export-maximiser' || selectedStrategy === 'import-minimiser') && monthSummary.missedFullCharges > 0) {
             summaryHTML += `<li class="border-t border-gray-200 my-2"></li><li class="flex justify-between text-yellow-500" title="The battery did not reach its target SoC on these days during the Force Charge window, likely due to grid import (MIC) or charge rate limits."><span>Missed Full Charges:</span><span class="font-mono font-bold">${monthSummary.missedFullCharges} days</span></li>`;
         }
         document.getElementById('monthlySummaryList').innerHTML = summaryHTML;
@@ -1319,13 +1348,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = getSimulationParameters();
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
 
-        // --- MODIFIED: Update strategy title with all 3 options ---
+        // --- MODIFIED: Update strategy title with all 4 options ---
         const strategyDisplayEl = document.getElementById('dailyAnalysisStrategy');
         if (strategyDisplayEl) {
             let formattedName;
             if (selectedStrategy === 'self-consumption') formattedName = 'Self-Consumption';
             else if (selectedStrategy === 'export-maximiser') formattedName = 'Export Maximiser';
             else if (selectedStrategy === 'balanced-export-maximiser') formattedName = 'Balanced Export Maximiser';
+            else if (selectedStrategy === 'import-minimiser') formattedName = 'Import Minimiser';
             strategyDisplayEl.textContent = `(${formattedName})`;
         }
 
@@ -1337,6 +1367,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'balanced-export-maximiser':
                 detailedLogForStrategy = simulationResults.balancedExportMaximiser.detailedLog;
+                break;
+            case 'import-minimiser':
+                detailedLogForStrategy = simulationResults.importMinimiser.detailedLog;
                 break;
             default:
                 detailedLogForStrategy = simulationResults.selfConsumption.detailedLog;
@@ -1382,8 +1415,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optimizationChartInstance) optimizationChartInstance.destroy();
         const ctx = document.getElementById('optimizationChart').getContext('2d');
     
-        // --- MODIFIED: Destructure all three results ---
-        const { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, sizes } = optimizationData;
+        // --- MODIFIED: Destructure all four results ---
+        const { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes } = optimizationData;
     
         // Highlight the data point for the user's currently selected size
         const pointRadii = sizes.map(size => size === userSelectedSize ? 6 : 3);
@@ -1422,6 +1455,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         data: balancedExportMaximiserResults.map(d => d.savings),
                         borderColor: 'rgba(5, 150, 105, 1)', // Emerald-600
                         backgroundColor: 'rgba(5, 150, 105, 1)',
+                        pointRadius: pointRadii,
+                        pointHoverRadius: 8,
+                        fill: false,
+                        tension: 0.1
+                    },
+                    // --- ADDED: Dataset for import minimiser strategy ---
+                    {
+                        label: 'Import Minimiser',
+                        data: importMinimiserResults.map(d => d.savings),
+                        borderColor: 'rgba(59, 130, 246, 1)', // Blue-500
+                        backgroundColor: 'rgba(59, 130, 246, 1)',
                         pointRadius: pointRadii,
                         pointHoverRadius: 8,
                         fill: false,
@@ -1618,6 +1662,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'balanced-export-maximiser':
                 detailedLog = simulationResults.balancedExportMaximiser?.detailedLog;
+                break;
+            case 'import-minimiser':
+                detailedLog = simulationResults.importMinimiser?.detailedLog;
                 break;
             default:
                 detailedLog = simulationResults.selfConsumption?.detailedLog;
