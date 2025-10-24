@@ -235,6 +235,14 @@
                             </div>
                             <div id="desc-balanced-export-maximiser" class="strategy-description hidden">A balanced version of the Export Maximiser. It avoids pre-emptive grid export during the winter months (Nov, Dec, Jan, Feb) to preserve battery for higher heating loads.</div>
                         </label>
+                        
+                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
+                            <div class="flex items-center">
+                                <input id="strategy-import-minimiser" type="radio" value="import-minimiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <span class="ml-3 font-medium">Import Minimiser</span>
+                            </div>
+                            <div id="desc-import-minimiser" class="strategy-description hidden">Prioritises self-consumption, but *also* force-charges from the grid during cheap rates. It *never* force-discharges, ensuring the battery is full for your own use.</div>
+                        </label>
                         </div>
                 </div>
 
@@ -243,37 +251,37 @@
                 <div>
                     <h3 class="text-lg font-medium text-indigo-600 mb-2">4. Financials</h3>
                     <p class="text-xs text-gray-500 mb-4">Ensure all costs and unit prices include VAT.</p>
-                        <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
-                        <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200">
-                            <h4 class="font-semibold mb-2">Import Tariff</h4>
-                               <div class="grid grid-cols-2 gap-4 mb-4">
-                                   <label for="importTariffFlat" class="flex items-center cursor-pointer">
-                                       <input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                       <span class="ml-2 block text-sm">Flat Rate</span>
-                                   </label>
-                                   <label for="importTariffHourly" class="flex items-center cursor-pointer">
-                                       <input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                       <span class="ml-2 block text-sm">Hourly</span>
-                                    </label>
-                               </div>
-                            <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
-                            <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
-                        </div>
-                           <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200">
-                            <h4 class="font-semibold mb-2">Export Tariff</h4>
-                               <div class="grid grid-cols-2 gap-4 mb-4">
-                                    <label for="exportTariffFlat" class="flex items-center cursor-pointer">
-                                       <input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                       <span class="ml-2 block text-sm">Flat Rate</span>
-                                    </label>
-                                    <label for="exportTariffHourly" class="flex items-center cursor-pointer">
-                                       <input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                       <span class="ml-2 block text-sm">Hourly</span>
-                                    </label>
-                               </div>
-                            <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
-                            <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
-                        </div>
+                            <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
+                            <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200">
+                                <h4 class="font-semibold mb-2">Import Tariff</h4>
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                        <label for="importTariffFlat" class="flex items-center cursor-pointer">
+                                            <input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                            <span class="ml-2 block text-sm">Flat Rate</span>
+                                        </label>
+                                        <label for="importTariffHourly" class="flex items-center cursor-pointer">
+                                            <input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                            <span class="ml-2 block text-sm">Hourly</span>
+                                         </label>
+                                    </div>
+                                <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
+                                <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
+                            </div>
+                                <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200">
+                                <h4 class="font-semibold mb-2">Export Tariff</h4>
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                         <label for="exportTariffFlat" class="flex items-center cursor-pointer">
+                                            <input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                            <span class="ml-2 block text-sm">Flat Rate</span>
+                                         </label>
+                                         <label for="exportTariffHourly" class="flex items-center cursor-pointer">
+                                            <input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                            <span class="ml-2 block text-sm">Hourly</span>
+                                         </label>
+                                    </div>
+                                <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.15" step="0.01"></div>
+                                <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
+                            </div>
                 </div>
             </form>
 
@@ -292,6 +300,7 @@
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Self-Consumption</th>
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Export Maximiser</th>
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Balanced Export Maximiser</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Import Minimiser</th>
                                 </tr>
                         </thead>
                         <tbody id="comparisonTableBody" class="divide-y divide-gray-100">
@@ -304,7 +313,7 @@
                     <h3 class="text-xl font-semibold text-center mb-4">Battery Size vs. Annual Savings</h3>
                     <div class="relative h-80"><canvas id="optimizationChart"></canvas></div>
                     <p class="text-xs text-center text-gray-500 mt-2">This chart compares the estimated annual savings for all simulation strategies across different battery sizes. The larger dots indicate your currently selected system size.</p>
-V                </div>
+                </div>
 
                 <hr class="my-12 border-gray-300"/>
 
