@@ -5,8 +5,12 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.3.0
+ * @version 2.4.0
  * @changelog
+ * - v2.4.0:
+ * - (Feature) Added functionality to export simulated grid import/export as a new HDF file.
+ * - (HDF Export) Uses a generic MPRN for privacy.
+ * - (HDF Export) Creates HDF files for all 4 strategies, compatible with external tariff analysis sites.
  * - v2.3.0:
  * - (Feature) Added 'Import Minimiser' strategy.
  * - (Import Minimiser) This strategy force-charges at cheap rates but never force-discharges.
@@ -28,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const INTERVALS_PER_DAY = 24 / HOURS_PER_INTERVAL;
     const DAYS_IN_YEAR = 365;
     const FLOAT_TOLERANCE = 0.001; // A small value to avoid floating-point inaccuracies in comparisons.
+    const GENERIC_MPRN = "12345678912"; // Generic MPRN for exported HDF files
+    const GENERIC_METER_ID = "SIMULATED_METER"; // Generic Meter ID for exported HDF files
 
     // --- APPLICATION STATE --- //
     let fullData = []; // Holds the filtered 12-month dataset from the user's file.
@@ -71,6 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.getElementById('calculateBtn').addEventListener('click', runFullSimulation);
         document.getElementById('exportBtn').addEventListener('click', exportResultsToCSV);
+
+        // --- NEW HDF EXPORT LISTENERS ---
+        // These will be null until the results panel is shown, so optional chaining is used.
+        document.getElementById('exportHdfScBtn')?.addEventListener('click', () => exportSimulatedHDF('selfConsumption'));
+        document.getElementById('exportHdfEmBtn')?.addEventListener('click', () => exportSimulatedHDF('exportMaximiser'));
+        document.getElementById('exportHdfBemBtn')?.addEventListener('click', () => exportSimulatedHDF('balancedExportMaximiser'));
+        document.getElementById('exportHdfImBtn')?.addEventListener('click', () => exportSimulatedHDF('importMinimiser'));
+        // --- END NEW HDF EXPORT LISTENERS ---
 
         // Daily view navigation
         document.getElementById('monthSelector').addEventListener('change', e => updateDaySelector(e.target.value));
@@ -1122,6 +1136,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resultsPanel').classList.remove('hidden'); 
         document.getElementById('optimizationChartContainer').classList.remove('hidden');
         
+        // --- NEW ---
+        // Now that the results panel is visible, find and add event listeners to the new HDF buttons
+        document.getElementById('exportHdfScBtn')?.addEventListener('click', () => exportSimulatedHDF('selfConsumption'));
+        document.getElementById('exportHdfEmBtn')?.addEventListener('click', () => exportSimulatedHDF('exportMaximiser'));
+        document.getElementById('exportHdfBemBtn')?.addEventListener('click', () => exportSimulatedHDF('balancedExportMaximiser'));
+        document.getElementById('exportHdfImBtn')?.addEventListener('click', () => exportSimulatedHDF('importMinimiser'));
+        // --- END NEW ---
+
         // Show a warning if the Export Maximiser results were generated without any force-charge hours selected.
         const warningEl = document.getElementById('comparisonWarning');
         if (warningEl) {
@@ -1709,6 +1731,85 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus(`Exported ${fileName}`, 'success');
     }
+
+    // --- NEW HDF EXPORT FUNCTIONS ---
+
+    /**
+     * Formats a Date object into the DD-MM-YYYY HH:MM format required for HDF files.
+     * @param {Date} date - The Date object to format.
+     * @returns {string} The formatted date string.
+     */
+    function formatDateForHDF(date) {
+        const pad = (num) => num.toString().padStart(2, '0');
+        const day = pad(date.getUTCDate());
+        const month = pad(date.getUTCMonth() + 1); // getUTCMonth() is 0-indexed
+        const year = date.getUTCFullYear();
+        const hours = pad(date.getUTCHours());
+        const minutes = pad(date.getUTCMinutes());
+        return `${day}-${month}-${year} ${hours}:${minutes}`;
+    }
+
+    /**
+     * Exports the simulated grid import/export for a specific strategy as a new HDF-compatible CSV.
+     * @param {'selfConsumption' | 'exportMaximiser' | 'balancedExportMaximiser' | 'importMinimiser'} strategy - The key for the simulation results.
+     */
+    function exportSimulatedHDF(strategy) {
+        if (!strategy || !simulationResults[strategy]) {
+            setStatus(`No simulation data found for strategy: ${strategy}. Please run a simulation first.`, "warning");
+            return;
+        }
+
+        const detailedLog = simulationResults[strategy].detailedLog;
+        if (!detailedLog || detailedLog.length === 0) {
+            setStatus(`No detailed log data found for strategy: ${strategy}.`, "warning");
+            return;
+        }
+
+        const headers = "MPRN,Meter Serial Number,Read Value,Read Type,Read Date and End Time";
+        const rows = [];
+
+        detailedLog.forEach(log => {
+            const formattedTimestamp = formatDateForHDF(log.timestamp);
+            
+            // Create the Active Import row
+            const importRow = [
+                GENERIC_MPRN,
+                GENERIC_METER_ID,
+                log.gridImport.toFixed(4),
+                "Active Import Interval (kWh)",
+                formattedTimestamp
+            ].join(',');
+
+            // Create the Active Export row
+            const exportRow = [
+                GENERIC_MPRN,
+                GENERIC_METER_ID,
+                log.gridExport.toFixed(4),
+                "Active Export Interval (kWh)",
+                formattedTimestamp
+            ].join(',');
+
+            rows.push(importRow);
+            rows.push(exportRow);
+        });
+
+        const csvContent = [headers, ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+
+        link.setAttribute("href", URL.createObjectURL(blob));
+        const fileName = `simulated_hdf_${strategy}.csv`;
+        link.setAttribute("download", fileName);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setStatus(`Exported ${fileName}`, 'success');
+    }
+    // --- END NEW HDF EXPORT FUNCTIONS ---
+
 
     // --- START THE APP --- //
     initialize();
