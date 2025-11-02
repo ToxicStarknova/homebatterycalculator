@@ -5,16 +5,17 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.5.0
+ * @version 2.6.0
  * @changelog
+ * - v2.6.0:
+ * - (UI) Updated default import rates to Pinergy EV tariff (0.06€ at 2-4am).
+ * - (UI) Updated default flat/hourly export rate to 0.25€.
  * - v2.5.0:
  * - (Fix) Fixed 30-minute timestamp offset.
  * - (parseHDF) Now subtracts 30 minutes from HDF 'End Time' to get the 'Start Time' for internal use.
  * - (exportSimulatedHDF) Now adds 30 minutes to internal 'Start Time' to create a valid HDF 'End Time'.
  * - v2.4.0:
  * - (Feature) Added functionality to export simulated grid import/export as a new HDF file.
- * - (HDF Export) Uses a generic MPRN for privacy.
- * - (HDF Export) Creates HDF files for all 4 strategies, compatible with external tariff analysis sites.
  * - v2.3.0:
  * - (Feature) Added 'Import Minimiser' strategy.
  * - v2.2.0:
@@ -131,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Dynamically generates the HTML tables for hourly import/export rate inputs.
      */
     function createHourlyRateInputs() {
-        const createTable = (type, defaultValue) => {
+        const createTable = (type, defaultValues) => {
             let tableHTML = `<table class="tariff-table"><thead><tr>
                 <th class="border-r border-gray-200">Time</th>
                 <th class="text-center">Rate (€/kWh)</th>
@@ -139,6 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr></thead><tbody>`;
 
             for (let i = 0; i < 24; i++) {
+                // Check if defaultValues is an array or a single value
+                const defaultValue = Array.isArray(defaultValues) ? defaultValues[i] : defaultValues;
                 const hour = i.toString().padStart(2, '0');
                 tableHTML += `<tr>
                     <td class="border-r border-gray-200">${hour}:00-${hour}:59</td>
@@ -151,9 +154,22 @@ document.addEventListener('DOMContentLoaded', () => {
             tableHTML += '</tbody></table>';
             return tableHTML;
         };
-        // --- MODIFIED: Changed default import rate to 0.42 ---
-        document.getElementById('hourlyImportGrid').innerHTML = createTable('import', '0.42');
-        document.getElementById('hourlyExportGrid').innerHTML = createTable('export', '0.15');
+
+        // --- NEW: Create an array for the 24 default import rates ---
+        const defaultImportRates = Array(24).fill('0.42'); // Default standard rate
+
+        // Set Pinergy EV rates (02:00-04:59)
+        defaultImportRates[2] = '0.06'; // 02:00 - 02:59
+        defaultImportRates[3] = '0.06'; // 03:00 - 03:59
+        defaultImportRates[4] = '0.06'; // 04:00 - 04:59
+        // --- END NEW ---
+
+        // --- NEW: Set default export rate to 0.25 ---
+        const defaultExportRate = '0.25';
+        // --- END NEW ---
+
+        document.getElementById('hourlyImportGrid').innerHTML = createTable('import', defaultImportRates);
+        document.getElementById('hourlyExportGrid').innerHTML = createTable('export', defaultExportRate);
     }
     
     /**
@@ -1780,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // We must add 30 minutes back before formatting.
             const intervalEndTime = new Date(log.timestamp.getTime() + THIRTY_MINUTES_MS);
             const formattedTimestamp = formatDateForHDF(intervalEndTime);
-            // --- *** END FIX *** ---
+            // --- *** END FIX ---
 
             // Create the Active Import row
             const importRow = [
