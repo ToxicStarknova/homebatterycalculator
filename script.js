@@ -5,24 +5,22 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.4.0
+ * @version 2.5.0
  * @changelog
+ * - v2.5.0:
+ * - (Fix) Fixed 30-minute timestamp offset.
+ * - (parseHDF) Now subtracts 30 minutes from HDF 'End Time' to get the 'Start Time' for internal use.
+ * - (exportSimulatedHDF) Now adds 30 minutes to internal 'Start Time' to create a valid HDF 'End Time'.
  * - v2.4.0:
  * - (Feature) Added functionality to export simulated grid import/export as a new HDF file.
  * - (HDF Export) Uses a generic MPRN for privacy.
  * - (HDF Export) Creates HDF files for all 4 strategies, compatible with external tariff analysis sites.
  * - v2.3.0:
  * - (Feature) Added 'Import Minimiser' strategy.
- * - (Import Minimiser) This strategy force-charges at cheap rates but never force-discharges.
- * - (UI) All comparison views updated to support four strategies.
  * - v2.2.0:
  * - (Feature) Added 'Balanced Export Maximiser' strategy.
- * - (Balanced) This strategy disables pre-emptive discharge during heating season (Nov, Dec, Jan, Feb).
- * - (UI) Changed default hourly import rate to 0.42.
- * - (UI) All comparison views updated to support three strategies.
  * - v2.1.0:
  * - (Export Maximiser) Changed pre-emptive discharge lookahead from 2 hours to 4 hours.
- * - (Export Maximiser) Now charges battery from excess solar *unless* in a pre-charge window.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const FLOAT_TOLERANCE = 0.001; // A small value to avoid floating-point inaccuracies in comparisons.
     const GENERIC_MPRN = "12345678912"; // Generic MPRN for exported HDF files
     const GENERIC_METER_ID = "SIMULATED_METER"; // Generic Meter ID for exported HDF files
+    const THIRTY_MINUTES_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
 
     // --- APPLICATION STATE --- //
     let fullData = []; // Holds the filtered 12-month dataset from the user's file.
@@ -404,12 +403,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!dateParts) continue;
 
             const [, day, month, year, hour, minute] = dateParts;
+            // originalTimestamp is the END of the interval
             const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
+            
             if (isNaN(originalTimestamp.getTime())) continue;
 
-            // Normalize the timestamp to the start of its 30-minute interval.
-            const halfHourBucketTimestamp = new Date(originalTimestamp);
-            halfHourBucketTimestamp.setUTCMinutes(Math.floor(originalTimestamp.getUTCMinutes() / 30) * 30, 0, 0);
+            // --- *** FIX *** ---
+            // The HDF 'Read Date and End Time' is the END of the 30-min interval.
+            // We must subtract 30 minutes to get the START of the interval,
+            // which is what the rest of the simulation uses as the key.
+            // (e.g., 02:00 data refers to the 01:30-02:00 interval, so it's keyed as 01:30)
+            const halfHourBucketTimestamp = new Date(originalTimestamp.getTime() - THIRTY_MINUTES_MS);
+            // --- *** END FIX *** ---
 
             const key = halfHourBucketTimestamp.toISOString();
             const readType = values[typeIndex]?.trim().replace(/"/g, '').toLowerCase();
@@ -1769,8 +1774,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = [];
 
         detailedLog.forEach(log => {
-            const formattedTimestamp = formatDateForHDF(log.timestamp);
-            
+            // --- *** FIX *** ---
+            // The log.timestamp is the START of the interval (e.g., 01:30).
+            // The HDF format requires the END of the interval (e.g., 02:00).
+            // We must add 30 minutes back before formatting.
+            const intervalEndTime = new Date(log.timestamp.getTime() + THIRTY_MINUTES_MS);
+            const formattedTimestamp = formatDateForHDF(intervalEndTime);
+            // --- *** END FIX *** ---
+
             // Create the Active Import row
             const importRow = [
                 GENERIC_MPRN,
