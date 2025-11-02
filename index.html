@@ -118,11 +118,11 @@
                         </label>
 
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                             <div class="flex items-center">
-                                <input id="dataSourcePvgis" type="radio" value="pvgis" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                <span class="ml-3 font-medium">Simulate New PV System</span>
-                            </div>
-                            <div class="strategy-description">Ignores generation data in your HDF and simulates a new solar PV system. Your HDF's consumption data is still used.</div>
+                               <div class="flex items-center">
+                                    <input id="dataSourcePvgis" type="radio" value="pvgis" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                    <span class="ml-3 font-medium">Simulate New PV System</span>
+                                </div>
+                                <div class="strategy-description">Ignores generation data in your HDF and simulates a new solar PV system. Your HDF's consumption data is still used.</div>
                         </label>
                     </div>
 
@@ -145,7 +145,7 @@
                         <div id="pvgis-summary" class="hidden mt-4 pt-4 border-t border-indigo-200">
                             <h4 class="font-semibold text-sm mb-2 text-gray-800">PVGIS File Summary</h4>
                             <div id="pvgis-summary-metrics" class="text-xs text-gray-600 space-y-1 mb-4">
-                                </div>
+                            </div>
                             <div class="relative h-48">
                                 <canvas id="pvgisMonthlyChart"></canvas>
                             </div>
@@ -220,12 +220,12 @@
                         </label>
 
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                             <div class="flex items-center">
-                                <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                <span class="ml-3 font-medium">Export Maximiser</span>
-                            </div>
-                            <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
-                            <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
+                               <div class="flex items-center">
+                                    <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                    <span class="ml-3 font-medium">Export Maximiser</span>
+                                </div>
+                                <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
+                                <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                         </label>
 
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
@@ -243,7 +243,7 @@
                             </div>
                             <div id="desc-import-minimiser" class="strategy-description hidden">Prioritises self-consumption, but *also* force-charges from the grid during cheap rates. It *never* force-discharges, ensuring the battery is full for your own use.</div>
                         </label>
-                        </div>
+                    </div>
                 </div>
 
                 <hr class="my-6 border-gray-200">
@@ -292,7 +292,7 @@
                 <h2 class="text-3xl font-bold mb-4 text-gray-800">"After" Scenario Annual Summary</h2>
                 <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
                     <div id="comparisonWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md" role="alert">
-                        </div>
+                    </div>
                     <table class="w-full text-left">
                         <thead>
                             <tr class="border-b-2 border-gray-200">
@@ -301,13 +301,34 @@
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Export Maximiser</th>
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Balanced Export Maximiser</th>
                                 <th class="p-3 text-sm font-semibold text-gray-800 text-center">Import Minimiser</th>
-                                </tr>
+                            </tr>
                         </thead>
                         <tbody id="comparisonTableBody" class="divide-y divide-gray-100">
-                            </tbody>
+                        </tbody>
                     </table>
                     <p class="text-xs text-center text-gray-500 mt-2">Select a strategy in the configuration panel to view its detailed daily performance below.</p>
-                </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <h4 class="text-lg font-semibold text-center text-gray-700 mb-4">Download Simulated HDF File</h4>
+                        <p class="text-sm text-center text-gray-500 mb-4">
+                            Download a new HDF file based on the simulated grid import/export for each strategy. You can use this file on a tariff comparison website.
+                        </p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <button id="exportHdfScBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
+                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Self-Consumption HDF
+                            </button>
+                            <button id="exportHdfEmBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
+                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Export Maximiser HDF
+                            </button>
+                            <button id="exportHdfBemBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
+                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Balanced Export HDF
+                            </button>
+                            <button id="exportHdfImBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
+                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Import Minimiser HDF
+                            </button>
+                        </div>
+                    </div>
+                    </div>
 
                 <div id="optimizationChartContainer" class="bg-white p-6 rounded-lg shadow-lg mb-8 hidden">
                     <h3 class="text-xl font-semibold text-center mb-4">Battery Size vs. Annual Savings</h3>
