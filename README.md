@@ -1,11 +1,3 @@
-Here is the updated `README.md` file.
-
-I have updated the **Features**, **How to Use**, and **Disclaimer** sections to reflect all the new functionality we've added, including the four simulation strategies, the HDF export, the `energypal.ie` integration, and the all-important disclaimers.
-
-You can replace your entire old `README.md` with the text below.
-
----
-
 # Home Battery Savings Calculator
 
 A browser-based tool designed to help Irish homeowners with solar PV systems estimate the potential financial savings of installing a home battery. By uploading their official ESB Networks HDF (Harmonised Data File), users can run a detailed, year-long simulation to see how a battery would have performed with their actual energy consumption and generation data.
