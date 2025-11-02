@@ -5,8 +5,10 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.6.0
+ * @version 2.6.1
  * @changelog
+ * - v2.6.1:
+ * - (Fix) Removed duplicate event listeners in updateUIWithResults to prevent multiple HDF downloads.
  * - v2.6.0:
  * - (UI) Updated default import rates to Pinergy EV tariff (0.06€ at 2-4am).
  * - (UI) Updated default flat/hourly export rate to 0.25€.
@@ -14,14 +16,6 @@
  * - (Fix) Fixed 30-minute timestamp offset.
  * - (parseHDF) Now subtracts 30 minutes from HDF 'End Time' to get the 'Start Time' for internal use.
  * - (exportSimulatedHDF) Now adds 30 minutes to internal 'Start Time' to create a valid HDF 'End Time'.
- * - v2.4.0:
- * - (Feature) Added functionality to export simulated grid import/export as a new HDF file.
- * - v2.3.0:
- * - (Feature) Added 'Import Minimiser' strategy.
- * - v2.2.0:
- * - (Feature) Added 'Balanced Export Maximiser' strategy.
- * - v2.1.0:
- * - (Export Maximiser) Changed pre-emptive discharge lookahead from 2 hours to 4 hours.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -78,13 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('calculateBtn').addEventListener('click', runFullSimulation);
         document.getElementById('exportBtn').addEventListener('click', exportResultsToCSV);
 
-        // --- NEW HDF EXPORT LISTENERS ---
-        // These will be null until the results panel is shown, so optional chaining is used.
+        // --- HDF EXPORT LISTENERS ---
+        // These buttons are in the HTML from the start, just hidden.
+        // We add the listeners here *once* on page load.
         document.getElementById('exportHdfScBtn')?.addEventListener('click', () => exportSimulatedHDF('selfConsumption'));
         document.getElementById('exportHdfEmBtn')?.addEventListener('click', () => exportSimulatedHDF('exportMaximiser'));
         document.getElementById('exportHdfBemBtn')?.addEventListener('click', () => exportSimulatedHDF('balancedExportMaximiser'));
         document.getElementById('exportHdfImBtn')?.addEventListener('click', () => exportSimulatedHDF('importMinimiser'));
-        // --- END NEW HDF EXPORT LISTENERS ---
+        // --- END HDF EXPORT LISTENERS ---
 
         // Daily view navigation
         document.getElementById('monthSelector').addEventListener('change', e => updateDaySelector(e.target.value));
@@ -103,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Safeguard: Only add listeners for PVGIS elements if they exist in the DOM.
-        // This prevents errors if the script loads before the HTML is fully parsed.
         const pvgisFileEl = document.getElementById('pvgisFile');
         if (pvgisFileEl) {
             pvgisFileEl.addEventListener('change', handlePvgisFileChange);
@@ -179,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFinancialsUI() {
         const strategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        // --- MODIFIED: Check for any strategy that requires force charging ---
         const requiresForceCharge = strategy === 'export-maximiser' || strategy === 'balanced-export-maximiser' || strategy === 'import-minimiser';
 
         // Toggle visibility of the "Force Charge" column in tariff tables
@@ -241,7 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryContainer = document.getElementById('pvgis-summary');
         const summaryMetricsEl = document.getElementById('pvgis-summary-metrics');
 
-        // Safeguard: If the necessary UI elements don't exist, we can't proceed.
         if (!summaryContainer || !summaryMetricsEl) {
             console.error("PVGIS summary UI elements are missing from the DOM.");
             return;
@@ -280,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const summaryMetricsEl = document.getElementById('pvgis-summary-metrics');
 
-        // The data is now used directly without scaling.
         const dataForSummary = pvgisUnscaledData.data;
         const metadata = pvgisUnscaledData.metadata;
 
@@ -289,7 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate metrics
         let specifiedPowerHtml = '';
         if (metadata.specifiedPeakPower) {
-            // The specified power from the file is NOT scaled, which is useful for comparison.
             specifiedPowerHtml = `<p><strong>Specified System Size (in file):</strong> ${metadata.specifiedPeakPower.toFixed(2)} kWp</p>`;
         }
         let yearInfoHtml = '';
@@ -548,7 +538,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Filters the parsed data to include only the last 12 full calendar months.
-     * This ensures that annual calculations are based on a complete year of data.
      * @param {Array<Object>} data - The full array of parsed data.
      * @returns {Array<Object>} The filtered data array.
      */
@@ -597,7 +586,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = getSimulationParameters();
         const hasForceChargeHours = params.forceChargeHours.some(h => h === true);
         
-        // --- MODIFIED: Validation check for all strategies requiring force charge ---
         const requiresForceCharge = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser' || params.strategy === 'import-minimiser';
         if (requiresForceCharge && !hasForceChargeHours) {
             setStatus(`Error: For the ${params.strategy} strategy, you must select at least one hour for Force Charging.`, 'error');
@@ -634,10 +622,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pvgisText = await pvgisFile.text();
                 const pvgisResult = parsePvgisCsv(pvgisText); // This is the unscaled data
 
-                // The data is used directly without scaling.
                 const rawPvgisData = pvgisResult.data;
                 
-                // Transform the PVGIS data using its own timestamps. The year-agnostic merge will happen later.
                 const transformedPvgisData = transformPvgisData(rawPvgisData);
 
                 parsedData = mergePvgisData(parsedData, transformedPvgisData);
@@ -662,7 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await yieldToBrowser();
 
-            // --- MODIFIED: Run All Four Simulations for Comparison ---
             setStatus('Running Self-Consumption simulation...', 'loading');
             await yieldToBrowser();
             const paramsSC = { ...params, strategy: 'self-consumption' };
@@ -673,13 +658,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const paramsEM = { ...params, strategy: 'export-maximiser' };
             const resultsEM = await runSimulation(fullData, paramsEM);
 
-            // --- ADDED: Run Balanced Export Maximiser Simulation ---
             setStatus('Running Balanced Export Maximiser simulation...', 'loading');
             await yieldToBrowser();
             const paramsBEM = { ...params, strategy: 'balanced-export-maximiser' };
             const resultsBEM = await runSimulation(fullData, paramsBEM);
 
-            // --- ADDED: Run Import Minimiser Simulation ---
             setStatus('Running Import Minimiser simulation...', 'loading');
             await yieldToBrowser();
             const paramsIM = { ...params, strategy: 'import-minimiser' };
@@ -688,10 +671,9 @@ document.addEventListener('DOMContentLoaded', () => {
             simulationResults = {
                 selfConsumption: resultsSC,
                 exportMaximiser: resultsEM,
-                balancedExportMaximiser: resultsBEM, // Added
-                importMinimiser: resultsIM // Added
+                balancedExportMaximiser: resultsBEM,
+                importMinimiser: resultsIM
             };
-            // --- END MODIFICATION ---
 
             updateUIWithResults(hasForceChargeHours);
 
@@ -912,21 +894,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const hour = row.timestamp.getUTCHours();
         
-        // --- ADDED: Get month for balanced strategy ---
         const month = row.timestamp.getUTCMonth(); // 0 = Jan, 1 = Feb, ..., 10 = Nov, 11 = Dec
         const isHeatingSeason = [0, 1, 10, 11].includes(month); // Jan, Feb, Nov, Dec
-        // --- END ADDED ---
 
         const availableEnergyInBattery = Math.max(0, batterySoC - minSoC_kWh);
         const spaceInBattery = Math.max(0, maxSoC_kWh - batterySoC);
         
-        // --- MODIFIED: Check for all relevant strategies ---
         const isExportStrategy = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser';
         const isImportMinimiser = params.strategy === 'import-minimiser';
         const isForceChargeHour = (isExportStrategy || isImportMinimiser) && params.forceChargeHours[hour];
-        // --- END MODIFIED ---
 
-        // --- MODIFIED LOGIC (Part 2) ---
         // Define pre-charge hour logic (4-hour window) to be used in steps 4 and 5.
         let isPreChargeHour = false;
         if (isExportStrategy && !isForceChargeHour) { // Note: This is intentionally !isImportMinimiser
@@ -937,11 +914,10 @@ document.addEventListener('DOMContentLoaded', () => {
             isPreChargeHour = (
                 params.forceChargeHours[nextHour] || 
                 params.forceChargeHours[hourAfterNext] ||
-                params.forceChargeHours[hourAfterNext2] || // Added
-                params.forceChargeHours[hourAfterNext3] // Added
+                params.forceChargeHours[hourAfterNext2] ||
+                params.forceChargeHours[hourAfterNext3]
             );
         }
-        // --- END MODIFICATION (Part 2) ---
 
         // 1. Direct Solar Self-Consumption
         let remainingDemand = homeConsumption;
@@ -966,7 +942,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 4. Handle Excess Solar Generation
         if (excessSolar > 0) {
-            // --- MODIFIED LOGIC (Part 1) ---
             if (isExportStrategy && isPreChargeHour) {
                 // It's a pre-charge hour. Do NOT charge. Export all solar to help empty the battery.
                 gridExport += excessSolar;
@@ -982,19 +957,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     gridExport += excessSolar; // Export all if battery is full or can't be charged
                 }
             }
-            // --- END MODIFICATION (Part 1) ---
         }
 
         // 5. Handle Force-Charge Strategy Logic
         if (isExportStrategy || isImportMinimiser) {
             // 5a. Pre-emptive discharge: Dump battery charge to the grid just before a force-charge window
-            // This will only run if isExportStrategy is true (and thus isPreChargeHour can be true)
             if (isPreChargeHour) {
                 
-                // --- ADDED LOGIC FOR BALANCED STRATEGY ---
                 // Check if we should skip pre-emptive discharge
                 const skipPreemptiveDischarge = (params.strategy === 'balanced-export-maximiser' && isHeatingSeason);
-                // --- END ADDED LOGIC ---
 
                 if (!skipPreemptiveDischarge) { // Only run if we are NOT skipping
                     const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * HOURS_PER_INTERVAL);
@@ -1012,7 +983,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // 5b. Force Charge from Grid
-            // This will run for ALL strategies if isForceChargeHour is true
             if (isForceChargeHour) {
                 forceChargeScheduledToday = true;
                 const homeImportPower = remainingDemand / HOURS_PER_INTERVAL; // Remaining demand is now home import
@@ -1098,9 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const selfConsumptionResults = [];
         const exportMaximiserResults = [];
-        // --- ADDED: Array for balanced results ---
         const balancedExportMaximiserResults = [];
-        // --- ADDED: Array for import minimiser results ---
         const importMinimiserResults = [];
 
         for (const size of sizesToTest) {
@@ -1125,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 savings: resultEM.annualSavings
             });
 
-            // --- ADDED: Run for Balanced Export Maximiser ---
+            // Run for Balanced Export Maximiser
             const paramsBEM = { ...commonParams, strategy: 'balanced-export-maximiser' };
             const resultBEM = await runSimulation(data, paramsBEM);
             balancedExportMaximiserResults.push({
@@ -1133,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 savings: resultBEM.annualSavings
             });
             
-            // --- ADDED: Run for Import Minimiser ---
+            // Run for Import Minimiser
             const paramsIM = { ...commonParams, strategy: 'import-minimiser' };
             const resultIM = await runSimulation(data, paramsIM);
             importMinimiserResults.push({
@@ -1142,7 +1110,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- MODIFIED: Return all four results ---
         return { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes: sizesToTest };
     }
 
@@ -1157,13 +1124,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resultsPanel').classList.remove('hidden'); 
         document.getElementById('optimizationChartContainer').classList.remove('hidden');
         
-        // --- NEW ---
-        // Now that the results panel is visible, find and add event listeners to the new HDF buttons
-        document.getElementById('exportHdfScBtn')?.addEventListener('click', () => exportSimulatedHDF('selfConsumption'));
-        document.getElementById('exportHdfEmBtn')?.addEventListener('click', () => exportSimulatedHDF('exportMaximiser'));
-        document.getElementById('exportHdfBemBtn')?.addEventListener('click', () => exportSimulatedHDF('balancedExportMaximiser'));
-        document.getElementById('exportHdfImBtn')?.addEventListener('click', () => exportSimulatedHDF('importMinimiser'));
-        // --- END NEW ---
+        // --- *** FIX *** ---
+        // REMOVED duplicate event listeners from this function.
+        // They are now only in setupEventListeners()
+        // --- *** END FIX *** ---
 
         // Show a warning if the Export Maximiser results were generated without any force-charge hours selected.
         const warningEl = document.getElementById('comparisonWarning');
@@ -1187,7 +1151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultsIM = simulationResults.importMinimiser;
         const tableBody = document.getElementById('comparisonTableBody');
 
-        // --- MODIFIED: createRow now accepts 4 values and finds the best ---
         const createRow = (metric, valueSC, valueEM, valueBEM, valueIM, formatter) => {
             // For payback, bill, import, lower is better. For others, higher is better.
             const isLowerBetter = metric.toLowerCase().includes('payback') || metric.toLowerCase().includes('bill') || metric.toLowerCase().includes('import');
@@ -1213,7 +1176,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         };
 
-        // --- MODIFIED: Pass all 4 values to createRow ---
         tableBody.innerHTML = `
             ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, resultsBEM.annualSavings, resultsIM.annualSavings, formatCurrency)}
             ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, resultsBEM.paybackPeriod, resultsIM.paybackPeriod, formatYears)}
@@ -1288,7 +1250,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        // --- MODIFIED: Get log for the selected strategy ---
         let detailedLogForStrategy;
         switch (selectedStrategy) {
             case 'export-maximiser':
@@ -1335,7 +1296,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        // --- MODIFIED: Get results for the selected strategy ---
         let resultsForStrategy;
         switch (selectedStrategy) {
             case 'export-maximiser':
@@ -1391,7 +1351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = getSimulationParameters();
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
 
-        // --- MODIFIED: Update strategy title with all 4 options ---
         const strategyDisplayEl = document.getElementById('dailyAnalysisStrategy');
         if (strategyDisplayEl) {
             let formattedName;
@@ -1402,7 +1361,6 @@ document.addEventListener('DOMContentLoaded', () => {
             strategyDisplayEl.textContent = `(${formattedName})`;
         }
 
-        // --- MODIFIED: Get log for the selected strategy ---
         let detailedLogForStrategy;
         switch (selectedStrategy) {
             case 'export-maximiser':
@@ -1458,7 +1416,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optimizationChartInstance) optimizationChartInstance.destroy();
         const ctx = document.getElementById('optimizationChart').getContext('2d');
     
-        // --- MODIFIED: Destructure all four results ---
         const { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes } = optimizationData;
     
         // Highlight the data point for the user's currently selected size
@@ -1492,7 +1449,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         fill: false,
                         tension: 0.1
                     },
-                    // --- ADDED: Dataset for balanced strategy ---
                     {
                         label: 'Balanced Export Maximiser',
                         data: balancedExportMaximiserResults.map(d => d.savings),
@@ -1503,7 +1459,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         fill: false,
                         tension: 0.1
                     },
-                    // --- ADDED: Dataset for import minimiser strategy ---
                     {
                         label: 'Import Minimiser',
                         data: importMinimiserResults.map(d => d.savings),
@@ -1697,7 +1652,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get the log for the currently selected strategy
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        // --- MODIFIED: Get log for the selected strategy ---
         let detailedLog;
         switch (selectedStrategy) {
             case 'export-maximiser':
