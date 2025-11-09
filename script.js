@@ -5,17 +5,17 @@
  * the potential savings and performance of a battery system.
  *
  * @author Your Name/Team
- * @version 2.6.1
+ * @version 2.7.0
  * @changelog
+ * - v2.7.0:
+ * - (Feat) Added new 'Historical Forecast Charging' strategy.
+ * - This strategy looks at the next day's historical solar generation to decide whether to perform a cheap overnight charge.
+ * - It avoids buying grid energy if the next day is predicted to be sunny, saving battery capacity for free solar.
  * - v2.6.1:
  * - (Fix) Removed duplicate event listeners in updateUIWithResults to prevent multiple HDF downloads.
  * - v2.6.0:
  * - (UI) Updated default import rates to Pinergy EV tariff (0.06€ at 2-4am).
  * - (UI) Updated default flat/hourly export rate to 0.25€.
- * - v2.5.0:
- * - (Fix) Fixed 30-minute timestamp offset.
- * - (parseHDF) Now subtracts 30 minutes from HDF 'End Time' to get the 'Start Time' for internal use.
- * - (exportSimulatedHDF) Now adds 30 minutes to internal 'Start Time' to create a valid HDF 'End Time'.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const INTERVALS_PER_DAY = 24 / HOURS_PER_INTERVAL;
     const DAYS_IN_YEAR = 365;
     const FLOAT_TOLERANCE = 0.001; // A small value to avoid floating-point inaccuracies in comparisons.
+    // --- NEW ---
+    const FORECAST_CONSUMPTION_THRESHOLD = 0.75; // For Historical Forecast: Don't charge if tomorrow's solar is > 75% of avg daily consumption.
+    // --- END NEW ---
     const GENERIC_MPRN = "12345678912"; // Generic MPRN for exported HDF files
     const GENERIC_METER_ID = "SIMULATED_METER"; // Generic Meter ID for exported HDF files
     const THIRTY_MINUTES_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -73,12 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('exportBtn').addEventListener('click', exportResultsToCSV);
 
         // --- HDF EXPORT LISTENERS ---
-        // These buttons are in the HTML from the start, just hidden.
-        // We add the listeners here *once* on page load.
         document.getElementById('exportHdfScBtn')?.addEventListener('click', () => exportSimulatedHDF('selfConsumption'));
         document.getElementById('exportHdfEmBtn')?.addEventListener('click', () => exportSimulatedHDF('exportMaximiser'));
         document.getElementById('exportHdfBemBtn')?.addEventListener('click', () => exportSimulatedHDF('balancedExportMaximiser'));
         document.getElementById('exportHdfImBtn')?.addEventListener('click', () => exportSimulatedHDF('importMinimiser'));
+        // --- NEW ---
+        document.getElementById('exportHdfHfBtn')?.addEventListener('click', () => exportSimulatedHDF('historicalForecast'));
+        // --- END NEW ---
         // --- END HDF EXPORT LISTENERS ---
 
         // Daily view navigation
@@ -149,18 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return tableHTML;
         };
 
-        // --- NEW: Create an array for the 24 default import rates ---
         const defaultImportRates = Array(24).fill('0.42'); // Default standard rate
-
-        // Set Pinergy EV rates (02:00-04:59)
         defaultImportRates[2] = '0.06'; // 02:00 - 02:59
         defaultImportRates[3] = '0.06'; // 03:00 - 03:59
         defaultImportRates[4] = '0.06'; // 04:00 - 04:59
-        // --- END NEW ---
 
-        // --- NEW: Set default export rate to 0.25 ---
         const defaultExportRate = '0.25';
-        // --- END NEW ---
 
         document.getElementById('hourlyImportGrid').innerHTML = createTable('import', defaultImportRates);
         document.getElementById('hourlyExportGrid').innerHTML = createTable('export', defaultExportRate);
@@ -173,7 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFinancialsUI() {
         const strategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
-        const requiresForceCharge = strategy === 'export-maximiser' || strategy === 'balanced-export-maximiser' || strategy === 'import-minimiser';
+        // --- MODIFIED ---
+        const requiresForceCharge = ['export-maximiser', 'balanced-export-maximiser', 'import-minimiser', 'historical-forecast'].includes(strategy);
+        // --- END MODIFIED ---
 
         // Toggle visibility of the "Force Charge" column in tariff tables
         document.querySelectorAll('.force-control-col').forEach(c => c.classList.toggle('hidden', !requiresForceCharge));
@@ -373,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let headerIndex = -1;
         let header;
 
-        // Find the header row which contains specific key column names.
         for (let i = 0; i < lines.length; i++) {
             const lowerLine = lines[i].toLowerCase();
             if (lowerLine.includes('read date') && lowerLine.includes('read type') && (lowerLine.includes('read value') || lowerLine.includes('read val'))) {
@@ -395,7 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('HDF file is missing required columns (Date, Type, or Value).');
         }
 
-        // Use a map to aggregate consumption and generation data into 30-minute buckets.
         const dataMap = new Map();
         for (let i = headerIndex + 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
@@ -404,24 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (values.length <= Math.max(dateIndex, typeIndex, valueIndex)) continue;
             
             const dateStr = values[dateIndex]?.trim().replace(/"/g, '');
-            // Regex to handle DD/MM/YYYY HH:MM or DD-MM-YYYY HH:MM formats.
             const dateParts = dateStr?.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})\s(\d{2}):(\d{2})/);
             if (!dateParts) continue;
 
             const [, day, month, year, hour, minute] = dateParts;
-            // originalTimestamp is the END of the interval
             const originalTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
             
             if (isNaN(originalTimestamp.getTime())) continue;
 
-            // --- *** FIX *** ---
-            // The HDF 'Read Date and End Time' is the END of the 30-min interval.
-            // We must subtract 30 minutes to get the START of the interval,
-            // which is what the rest of the simulation uses as the key.
-            // (e.g., 02:00 data refers to the 01:30-02:00 interval, so it's keyed as 01:30)
             const halfHourBucketTimestamp = new Date(originalTimestamp.getTime() - THIRTY_MINUTES_MS);
-            // --- *** END FIX *** ---
-
             const key = halfHourBucketTimestamp.toISOString();
             const readType = values[typeIndex]?.trim().replace(/"/g, '').toLowerCase();
             const readValue = parseFloat(values[valueIndex]);
@@ -442,7 +431,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (dataMap.size === 0) return [];
         
-        // Convert map to array and sort by timestamp.
         return Array.from(dataMap.values()).sort((a, b) => a.timestamp - b.timestamp);
     }
     
@@ -459,10 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
             specifiedPeakPower: null
         };
 
-        // Find metadata and the start of the data.
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            // Look for metadata line like: # lat=..., lon=..., peakpower=10, ...
             if (line.startsWith('#') && line.includes('peakpower=')) {
                 const match = line.match(/peakpower=([0-9.]+)/);
                 if (match && match[1]) {
@@ -473,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (line.toLowerCase().startsWith('time,p,')) {
                 dataStartIndex = i + 1;
                 headers = line.split(',').map(h => h.trim());
-                break; // Stop searching once we find the data header
+                break;
             }
         }
 
@@ -498,7 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {Object} An object with monthly generation, total generation, and peak power.
      */
     function calculatePvgisSummary(rawPvgisData) {
-        // Find the most recent year in the dataset and check for multiple years
         let latestYear = 0;
         const allYears = new Set();
         rawPvgisData.forEach(d => {
@@ -509,7 +494,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Filter the data to only include the most recent year for the summary
         const singleYearData = rawPvgisData.filter(d => {
             const year = parseInt(d.time.substring(0, 4), 10);
             return year === latestYear;
@@ -519,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalAnnualGeneration = 0;
         let peakPower = 0;
 
-        // Use the single-year data for transformation and calculation
         const transformedData = transformPvgisData(singleYearData);
 
         transformedData.forEach(d => {
@@ -528,7 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
             totalAnnualGeneration += d.generation;
         });
 
-        // Find peak power from the single-year data as well for consistency
         singleYearData.forEach(d => {
             if (d.P > peakPower) peakPower = d.P;
         });
@@ -546,12 +528,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const latestTimestamp = data[data.length - 1].timestamp;
         
-        // Find the start of the month of the last data point.
         const endDate = new Date(latestTimestamp);
         endDate.setUTCDate(1);
         endDate.setUTCHours(0, 0, 0, 0);
 
-        // Subtract one year to get the start date.
         const startDate = new Date(endDate);
         startDate.setUTCFullYear(startDate.getUTCFullYear() - 1);
         
@@ -560,7 +540,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * A helper function to pause execution and allow the browser to repaint the UI.
-     * This is crucial for updating status messages during a long-running simulation.
      * @returns {Promise<void>}
      */
     const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -586,9 +565,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = getSimulationParameters();
         const hasForceChargeHours = params.forceChargeHours.some(h => h === true);
         
-        const requiresForceCharge = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser' || params.strategy === 'import-minimiser';
+        // --- MODIFIED ---
+        const requiresForceCharge = ['export-maximiser', 'balanced-export-maximiser', 'import-minimiser', 'historical-forecast'].includes(params.strategy);
+        // --- END MODIFIED ---
         if (requiresForceCharge && !hasForceChargeHours) {
-            setStatus(`Error: For the ${params.strategy} strategy, you must select at least one hour for Force Charging.`, 'error');
+            setStatus(`Error: For the selected strategy, you must select at least one hour for Force Charging.`, 'error');
             return;
         }
 
@@ -609,7 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 setStatus('Reading and parsing your PVGIS data file...', 'loading');
                 await yieldToBrowser();
 
-                // First, parse the HDF to get the consumption data and the target year
                 const fileText = await file.text();
                 let parsedData = parseHDF(fileText);
                 if (parsedData.length === 0) throw new Error('No valid data rows were parsed from the HDF file. Please check the file format.');
@@ -618,9 +598,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dataYear = lastDataPoint?.timestamp.getUTCFullYear();
                 if (!dataYear) throw new Error("Could not determine the year from your HDF data.");
 
-                // Now, parse the uploaded PVGIS file
                 const pvgisText = await pvgisFile.text();
-                const pvgisResult = parsePvgisCsv(pvgisText); // This is the unscaled data
+                const pvgisResult = parsePvgisCsv(pvgisText); 
 
                 const rawPvgisData = pvgisResult.data;
                 
@@ -631,7 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 await yieldToBrowser();
                 fullData = filterLast12FullMonths(parsedData);
             } else {
-                // If not using PVGIS, just parse the HDF as normal
                 const fileText = await file.text();
                 let parsedData = parseHDF(fileText);
                 if (parsedData.length === 0) throw new Error('No valid data rows were parsed from the HDF file. Please check the file format.');
@@ -668,19 +646,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const paramsIM = { ...params, strategy: 'import-minimiser' };
             const resultsIM = await runSimulation(fullData, paramsIM);
 
+            // --- NEW ---
+            setStatus('Running Historical Forecast simulation...', 'loading');
+            await yieldToBrowser();
+            const paramsHF = { ...params, strategy: 'historical-forecast' };
+            const resultsHF = await runSimulation(fullData, paramsHF);
+            // --- END NEW ---
+
             simulationResults = {
                 selfConsumption: resultsSC,
                 exportMaximiser: resultsEM,
                 balancedExportMaximiser: resultsBEM,
-                importMinimiser: resultsIM
+                importMinimiser: resultsIM,
+                historicalForecast: resultsHF // --- NEW ---
             };
 
             updateUIWithResults(hasForceChargeHours);
 
-            // Run optimization analysis for different battery sizes
             setStatus('Running optimization analysis for different battery sizes...', 'loading');
             await yieldToBrowser();
-            const optimizationData = await runOptimizationAnalysis(fullData, params); // Use user's selected params for this
+            const optimizationData = await runOptimizationAnalysis(fullData, params);
             generateOptimizationChart(optimizationData, params.batteryCapacity);
 
             setStatus('Simulation and analysis complete! Results are shown below.', 'success');
@@ -707,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
             minSoc: parseFloat(document.getElementById('minSoc').value),
             maxSoc: parseFloat(document.getElementById('maxSoc').value),
             maxChargeRate: parseFloat(document.getElementById('chargeRate').value),
-            maxDischargeRate: parseFloat(document.getElementById('chargeRate').value), // Assuming charge and discharge rates are the same
+            maxDischargeRate: parseFloat(document.getElementById('chargeRate').value),
             roundtripEfficiency: parseFloat(document.getElementById('roundtripEfficiency').value) / 100,
             systemCost: parseFloat(document.getElementById('systemCost').value),
             strategy: document.querySelector('input[name="strategy"]:checked').value,
@@ -745,15 +730,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const hour = parseInt(timeStr.substring(9, 11), 10);
 
             const powerInWatts = item.P;
-            // PVGIS gives average power (W) over the hour. To get energy (kWh) for 30 mins,
-            // we multiply by 0.5 hours and divide by 1000.
             const energyInKwh_30min = (powerInWatts * HOURS_PER_INTERVAL) / 1000;
 
-            // Create two 30-minute intervals for each hour, using the year from the PVGIS data itself.
             const firstIntervalTs = new Date(Date.UTC(pvgisYear, month, day, hour, 0, 0));
             const secondIntervalTs = new Date(Date.UTC(pvgisYear, month, day, hour, 30, 0));
 
-            // A safeguard against invalid dates that could be created from malformed CSV data.
             if (isNaN(firstIntervalTs.getTime())) return;
 
             pvgisData.push({ timestamp: firstIntervalTs, generation: energyInKwh_30min });
@@ -769,7 +750,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {Array<Object>} The merged dataset.
      */
     function mergePvgisData(consumptionData, generationData) {
-        // Helper to create a year-agnostic key (e.g., "02-29T14:30") from a Date object.
         const getMonthDayTimeKey = (date) => {
             const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
             const day = date.getUTCDate().toString().padStart(2, '0');
@@ -784,8 +764,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = getMonthDayTimeKey(row.timestamp);
             let newGeneration = genMap.get(key) || 0;
 
-            // Special handling for leap day (Feb 29). If the consumption data has a Feb 29
-            // but the generation data (from a non-leap year) does not, use Feb 28 data as a fallback.
             if (newGeneration === 0 && key.startsWith('02-29')) {
                 const fallbackKey = key.replace('02-29', '02-28');
                 newGeneration = genMap.get(fallbackKey) || 0;
@@ -809,7 +787,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailedLog = [];
         const efficiencySqrt = Math.sqrt(params.roundtripEfficiency);
 
-        // State variables for tracking daily metrics in the Export Maximiser strategy
+        // --- NEW ---
+        // Pre-calculate average daily consumption for the Historical Forecast strategy
+        if (params.strategy === 'historical-forecast') {
+            const totalConsumption = data.reduce((sum, row) => sum + row.consumption, 0);
+            const totalDays = data.length / INTERVALS_PER_DAY;
+            params.averageDailyConsumption = totalDays > 0 ? totalConsumption / totalDays : 0;
+        }
+        // --- END NEW ---
+
         let dailyMaxSoC = minSoC_kWh;
         let forceChargeScheduledToday = false;
 
@@ -817,7 +803,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = data[i];
             const prevRow = i > 0 ? data[i - 1] : null;
 
-            // --- Progress Update & Day Rollover Logic ---
             if (i > 0 && i % 1000 === 0) { 
                 setStatus(`Running ${params.strategy} simulation... (${Math.round((i/data.length)*100)}%)`, 'loading'); 
                 await yieldToBrowser(); 
@@ -828,26 +813,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 monthlyData[mKey] = { costWithoutBattery: 0, costWithBattery: 0, exportRevenue: 0, savings: 0, importWithoutBattery: 0, importWithBattery: 0, exportWithBattery: 0, consumption: 0, generation: 0, chargedToBattery: 0, dischargedFromBattery: 0, missedFullCharges: 0 };
             }
 
-            // Check if the day has changed to reset daily tracking variables
             if (prevRow && row.timestamp.getUTCDate() !== prevRow.timestamp.getUTCDate()) {
-                // If a force charge was scheduled but the battery didn't reach near-full, log it.
                 if (forceChargeScheduledToday && dailyMaxSoC < (maxSoC_kWh * 0.99)) {
                     const prevMKey = prevRow.timestamp.toISOString().slice(0, 7);
                     if (monthlyData[prevMKey]) monthlyData[prevMKey].missedFullCharges++;
                 }
-                // Reset daily trackers
                 dailyMaxSoC = batterySoC;
                 forceChargeScheduledToday = false;
             }
 
-            // --- Core Simulation Step ---
-            const result = runSingleTimeStep(row, batterySoC, params, minSoC_kWh, maxSoC_kWh, efficiencySqrt, forceChargeScheduledToday);
+            // --- MODIFIED ---
+            // Pass the full data array and current index 'i' to the step function for look-ahead capability
+            const result = runSingleTimeStep(row, batterySoC, params, minSoC_kWh, maxSoC_kWh, efficiencySqrt, forceChargeScheduledToday, data, i);
+            // --- END MODIFIED ---
 
-            // Update state for the next iteration
             batterySoC = result.newSoC;
             forceChargeScheduledToday = result.newForceChargeScheduledToday;
             
-            // --- Log & Aggregate Results ---
             const m = monthlyData[mKey];
             m.consumption += row.consumption; 
             m.generation += row.generation; 
@@ -858,7 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
             m.costWithBattery += result.gridImport * params.importPrices[row.timestamp.getUTCHours()]; 
             m.exportRevenue += result.gridExport * params.exportPrices[row.timestamp.getUTCHours()];
             
-            // Calculate baseline cost for comparison
             const energyImportWithoutBattery = Math.max(0, row.consumption - row.generation);
             m.costWithoutBattery += energyImportWithoutBattery * params.importPrices[row.timestamp.getUTCHours()];
             m.importWithoutBattery += energyImportWithoutBattery;
@@ -887,30 +868,34 @@ document.addEventListener('DOMContentLoaded', () => {
      * This function is the heart of the simulation's decision-making process.
      * @returns {Object} The results of this single time step.
      */
-    function runSingleTimeStep(row, currentSoC, params, minSoC_kWh, maxSoC_kWh, efficiencySqrt, forceChargeScheduledToday) {
+    // --- MODIFIED ---
+    function runSingleTimeStep(row, currentSoC, params, minSoC_kWh, maxSoC_kWh, efficiencySqrt, forceChargeScheduledToday, data, currentIndex) {
+    // --- END MODIFIED ---
         let { consumption: homeConsumption, generation: solarGeneration } = row;
         let batterySoC = currentSoC;
         let gridImport = 0, gridExport = 0, toBattery = 0, fromBattery = 0;
 
         const hour = row.timestamp.getUTCHours();
         
-        const month = row.timestamp.getUTCMonth(); // 0 = Jan, 1 = Feb, ..., 10 = Nov, 11 = Dec
-        const isHeatingSeason = [0, 1, 10, 11].includes(month); // Jan, Feb, Nov, Dec
+        const month = row.timestamp.getUTCMonth();
+        const isHeatingSeason = [0, 1, 10, 11].includes(month);
 
         const availableEnergyInBattery = Math.max(0, batterySoC - minSoC_kWh);
         const spaceInBattery = Math.max(0, maxSoC_kWh - batterySoC);
         
         const isExportStrategy = params.strategy === 'export-maximiser' || params.strategy === 'balanced-export-maximiser';
         const isImportMinimiser = params.strategy === 'import-minimiser';
-        const isForceChargeHour = (isExportStrategy || isImportMinimiser) && params.forceChargeHours[hour];
+        // --- NEW ---
+        const isHistoricalForecast = params.strategy === 'historical-forecast';
+        const isForceChargeHour = (isExportStrategy || isImportMinimiser || isHistoricalForecast) && params.forceChargeHours[hour];
+        // --- END NEW ---
 
-        // Define pre-charge hour logic (4-hour window) to be used in steps 4 and 5.
         let isPreChargeHour = false;
-        if (isExportStrategy && !isForceChargeHour) { // Note: This is intentionally !isImportMinimiser
+        if (isExportStrategy && !isForceChargeHour) {
             const nextHour = (hour + 1) % 24;
             const hourAfterNext = (hour + 2) % 24;
-            const hourAfterNext2 = (hour + 3) % 24; // 3 hours ahead
-            const hourAfterNext3 = (hour + 4) % 24; // 4 hours ahead
+            const hourAfterNext2 = (hour + 3) % 24;
+            const hourAfterNext3 = (hour + 4) % 24;
             isPreChargeHour = (
                 params.forceChargeHours[nextHour] || 
                 params.forceChargeHours[hourAfterNext] ||
@@ -943,31 +928,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Handle Excess Solar Generation
         if (excessSolar > 0) {
             if (isExportStrategy && isPreChargeHour) {
-                // It's a pre-charge hour. Do NOT charge. Export all solar to help empty the battery.
                 gridExport += excessSolar;
             } else {
-                // NOT a pre-charge hour OR strategy is self-consumption OR strategy is import-minimiser
-                // Prioritize charging battery with solar.
                 const chargeFromSolar = Math.min(excessSolar, spaceInBattery / efficiencySqrt, params.maxChargeRate * HOURS_PER_INTERVAL);
                 if (chargeFromSolar > FLOAT_TOLERANCE) {
                     batterySoC += chargeFromSolar * efficiencySqrt;
                     toBattery += chargeFromSolar;
-                    gridExport += excessSolar - chargeFromSolar; // Export any solar left over
+                    gridExport += excessSolar - chargeFromSolar;
                 } else {
-                    gridExport += excessSolar; // Export all if battery is full or can't be charged
+                    gridExport += excessSolar;
                 }
             }
         }
 
         // 5. Handle Force-Charge Strategy Logic
-        if (isExportStrategy || isImportMinimiser) {
-            // 5a. Pre-emptive discharge: Dump battery charge to the grid just before a force-charge window
-            if (isPreChargeHour) {
-                
-                // Check if we should skip pre-emptive discharge
+        if (isForceChargeHour) { // --- MODIFIED --- Moved main check here
+            // 5a. Pre-emptive discharge for export strategies
+            if (isExportStrategy && isPreChargeHour) {
                 const skipPreemptiveDischarge = (params.strategy === 'balanced-export-maximiser' && isHeatingSeason);
-
-                if (!skipPreemptiveDischarge) { // Only run if we are NOT skipping
+                if (!skipPreemptiveDischarge) {
                     const energyToDischarge = Math.min(availableEnergyInBattery * efficiencySqrt, params.maxDischargeRate * HOURS_PER_INTERVAL);
                     const currentExportPower = gridExport / HOURS_PER_INTERVAL;
                     const availableExportCapacity = params.mec - currentExportPower;
@@ -982,10 +961,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // 5b. Force Charge from Grid
-            if (isForceChargeHour) {
+            // --- NEW ---
+            // 5b. Historical Forecast check
+            let proceedWithForceCharge = true; // Default to always charging
+            if (isHistoricalForecast) {
+                const tomorrowData = data.slice(currentIndex + 1, currentIndex + 1 + INTERVALS_PER_DAY);
+                if (tomorrowData.length === INTERVALS_PER_DAY) {
+                    const predictedSolarForTomorrow = tomorrowData.reduce((sum, dayRow) => sum + dayRow.generation, 0);
+                    const predictionThreshold = params.averageDailyConsumption * FORECAST_CONSUMPTION_THRESHOLD;
+                    
+                    if (predictedSolarForTomorrow > predictionThreshold) {
+                        proceedWithForceCharge = false; // Sunny day ahead, skip charging to save space for free solar.
+                    }
+                }
+                // If at the end of the dataset, proceedWithForceCharge remains true, falling back gracefully.
+            }
+            // --- END NEW ---
+            
+            // 5c. Force Charge from Grid
+            if (proceedWithForceCharge) { // --- MODIFIED --- Now conditional
                 forceChargeScheduledToday = true;
-                const homeImportPower = remainingDemand / HOURS_PER_INTERVAL; // Remaining demand is now home import
+                const homeImportPower = remainingDemand / HOURS_PER_INTERVAL;
                 const availableGridPowerForCharge = params.mic - homeImportPower;
 
                 const chargePower = Math.min(params.maxChargeRate, availableGridPowerForCharge);
@@ -1000,7 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // 6. Final Clipping: Ensure grid export does not exceed the Maximum Export Capacity (MEC)
+        // 6. Final Clipping
         if (gridExport / HOURS_PER_INTERVAL > params.mec) {
             gridExport = params.mec * HOURS_PER_INTERVAL;
         }
@@ -1014,11 +1010,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Calculates final summary statistics after the simulation loop is complete.
-     * @param {Object} monthlyData - Aggregated data for each month.
-     * @param {number} dataLength - The total number of intervals simulated.
-     * @param {Array<Object>} detailedLog - The detailed log from the simulation.
-     * @param {Object} params - The simulation parameters.
-     * @returns {Object} The final results object.
      */
     function aggregateFinalResults(monthlyData, detailedLog, dataLength, params) {
         let totalConsumption = 0, totalImportWithBattery = 0, totalExportWithBattery = 0,
@@ -1054,13 +1045,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Runs the simulation for a range of battery sizes to find the optimal one.
-     * @param {Array<Object>} data - The time-series data.
-     * @param {Object} baseParams - The user's original simulation parameters.
-     * @returns {Promise<Array<Object>>} A promise that resolves to an array of {size, savings}.
      */
     async function runOptimizationAnalysis(data, baseParams) {
         const sizesToTest = [5, 10, 15, 20, 25, 30, 35, 40];
-        // Ensure the user's selected size is in the test set
         if (!sizesToTest.includes(baseParams.batteryCapacity)) {
             sizesToTest.push(baseParams.batteryCapacity);
             sizesToTest.sort((a, b) => a - b);
@@ -1070,9 +1057,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportMaximiserResults = [];
         const balancedExportMaximiserResults = [];
         const importMinimiserResults = [];
+        const historicalForecastResults = []; // --- NEW ---
 
         for (const size of sizesToTest) {
-            // Common parameters for this size
             const commonParams = { ...baseParams };
             commonParams.batteryCapacity = size;
             commonParams.usableCapacity = size * (parseFloat(document.getElementById('usableCapacity').value) / 100);
@@ -1080,37 +1067,34 @@ document.addEventListener('DOMContentLoaded', () => {
             // Run for Self-Consumption
             const paramsSC = { ...commonParams, strategy: 'self-consumption' };
             const resultSC = await runSimulation(data, paramsSC);
-            selfConsumptionResults.push({
-                size: size,
-                savings: resultSC.annualSavings
-            });
+            selfConsumptionResults.push({ size: size, savings: resultSC.annualSavings });
 
             // Run for Export Maximiser
             const paramsEM = { ...commonParams, strategy: 'export-maximiser' };
             const resultEM = await runSimulation(data, paramsEM);
-            exportMaximiserResults.push({
-                size: size,
-                savings: resultEM.annualSavings
-            });
+            exportMaximiserResults.push({ size: size, savings: resultEM.annualSavings });
 
             // Run for Balanced Export Maximiser
             const paramsBEM = { ...commonParams, strategy: 'balanced-export-maximiser' };
             const resultBEM = await runSimulation(data, paramsBEM);
-            balancedExportMaximiserResults.push({
-                size: size,
-                savings: resultBEM.annualSavings
-            });
+            balancedExportMaximiserResults.push({ size: size, savings: resultBEM.annualSavings });
             
             // Run for Import Minimiser
             const paramsIM = { ...commonParams, strategy: 'import-minimiser' };
             const resultIM = await runSimulation(data, paramsIM);
-            importMinimiserResults.push({
-                size: size,
-                savings: resultIM.annualSavings
-            });
+            importMinimiserResults.push({ size: size, savings: resultIM.annualSavings });
+
+            // --- NEW ---
+            // Run for Historical Forecast
+            const paramsHF = { ...commonParams, strategy: 'historical-forecast' };
+            const resultHF = await runSimulation(data, paramsHF);
+            historicalForecastResults.push({ size: size, savings: resultHF.annualSavings });
+            // --- END NEW ---
         }
         
-        return { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes: sizesToTest };
+        // --- MODIFIED ---
+        return { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, historicalForecastResults, sizes: sizesToTest };
+        // --- END MODIFIED ---
     }
 
 
@@ -1124,16 +1108,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resultsPanel').classList.remove('hidden'); 
         document.getElementById('optimizationChartContainer').classList.remove('hidden');
         
-        // --- *** FIX *** ---
-        // REMOVED duplicate event listeners from this function.
-        // They are now only in setupEventListeners()
-        // --- *** END FIX *** ---
-
-        // Show a warning if the Export Maximiser results were generated without any force-charge hours selected.
         const warningEl = document.getElementById('comparisonWarning');
         if (warningEl) {
             if (!hasForceChargeHours) {
-                warningEl.innerHTML = '<p class="font-bold">Note on "Export Maximiser" Results</p><p>No force-charge hours were selected. The results for this strategy are therefore not representative of its potential. To see an accurate comparison, select your cheap-rate hours in the hourly import tariff table and run the simulation again.</p>';
+                warningEl.innerHTML = '<p class="font-bold">Note on "Export Maximiser" & Forecast Results</p><p>No force-charge hours were selected. The results for any strategy other than Self-Consumption may not be representative. To see an accurate comparison, select your cheap-rate hours and run the simulation again.</p>';
                 warningEl.classList.remove('hidden');
             } else {
                 warningEl.classList.add('hidden');
@@ -1149,21 +1127,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultsEM = simulationResults.exportMaximiser;
         const resultsBEM = simulationResults.balancedExportMaximiser;
         const resultsIM = simulationResults.importMinimiser;
+        const resultsHF = simulationResults.historicalForecast; // --- NEW ---
         const tableBody = document.getElementById('comparisonTableBody');
 
-        const createRow = (metric, valueSC, valueEM, valueBEM, valueIM, formatter) => {
-            // For payback, bill, import, lower is better. For others, higher is better.
+        // --- MODIFIED ---
+        const createRow = (metric, valueSC, valueEM, valueBEM, valueIM, valueHF, formatter) => {
             const isLowerBetter = metric.toLowerCase().includes('payback') || metric.toLowerCase().includes('bill') || metric.toLowerCase().includes('import');
-            const values = [parseFloat(valueSC), parseFloat(valueEM), parseFloat(valueBEM), parseFloat(valueIM)];
+            const values = [parseFloat(valueSC), parseFloat(valueEM), parseFloat(valueBEM), parseFloat(valueIM), parseFloat(valueHF)];
             const bestValue = isLowerBetter ? Math.min(...values) : Math.max(...values);
 
-            // Check which value is the best, allowing for floating point tolerance
             const isBest = (val) => Math.abs(parseFloat(val) - bestValue) < FLOAT_TOLERANCE;
 
             const scClass = isBest(valueSC) ? 'text-green-600 font-bold' : '';
             const emClass = isBest(valueEM) ? 'text-green-600 font-bold' : '';
             const bemClass = isBest(valueBEM) ? 'text-green-600 font-bold' : '';
             const imClass = isBest(valueIM) ? 'text-green-600 font-bold' : '';
+            const hfClass = isBest(valueHF) ? 'text-green-600 font-bold' : '';
 
             return `
                 <tr class="text-center">
@@ -1172,26 +1151,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="p-3 font-mono ${emClass}">${formatter(valueEM)}</td>
                     <td class="p-3 font-mono ${bemClass}">${formatter(valueBEM)}</td>
                     <td class="p-3 font-mono ${imClass}">${formatter(valueIM)}</td>
+                    <td class="p-3 font-mono ${hfClass}">${formatter(valueHF)}</td>
                 </tr>
             `;
         };
 
         tableBody.innerHTML = `
-            ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, resultsBEM.annualSavings, resultsIM.annualSavings, formatCurrency)}
-            ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, resultsBEM.paybackPeriod, resultsIM.paybackPeriod, formatYears)}
-            ${createRow('Self-Sufficiency', resultsSC.selfSufficiency, resultsEM.selfSufficiency, resultsBEM.selfSufficiency, resultsIM.selfSufficiency, formatPercent)}
-            ${createRow('Annual Bill (After)', resultsSC.annualBillAfter, resultsEM.annualBillAfter, resultsBEM.annualBillAfter, resultsIM.annualBillAfter, formatCurrency)}
-            ${createRow('Annual Import', resultsSC.annualImportAfter, resultsEM.annualImportAfter, resultsBEM.annualImportAfter, resultsIM.annualImportAfter, formatKWh)}
-            ${createRow('Annual Export', resultsSC.annualExportAfter, resultsEM.annualExportAfter, resultsBEM.annualExportAfter, resultsIM.annualExportAfter, formatKWh)}
+            ${createRow('Annual Savings', resultsSC.annualSavings, resultsEM.annualSavings, resultsBEM.annualSavings, resultsIM.annualSavings, resultsHF.annualSavings, formatCurrency)}
+            ${createRow('Payback Period', resultsSC.paybackPeriod, resultsEM.paybackPeriod, resultsBEM.paybackPeriod, resultsIM.paybackPeriod, resultsHF.paybackPeriod, formatYears)}
+            ${createRow('Self-Sufficiency', resultsSC.selfSufficiency, resultsEM.selfSufficiency, resultsBEM.selfSufficiency, resultsIM.selfSufficiency, resultsHF.selfSufficiency, formatPercent)}
+            ${createRow('Annual Bill (After)', resultsSC.annualBillAfter, resultsEM.annualBillAfter, resultsBEM.annualBillAfter, resultsIM.annualBillAfter, resultsHF.annualBillAfter, formatCurrency)}
+            ${createRow('Annual Import', resultsSC.annualImportAfter, resultsEM.annualImportAfter, resultsBEM.annualImportAfter, resultsIM.annualImportAfter, resultsHF.annualImportAfter, formatKWh)}
+            ${createRow('Annual Export', resultsSC.annualExportAfter, resultsEM.annualExportAfter, resultsBEM.annualExportAfter, resultsIM.annualExportAfter, resultsHF.annualExportAfter, formatKWh)}
         `;
+        // --- END MODIFIED ---
         
-        // --- Generate Charts & Selectors ---
         generateBeforeSummary();
         generateMonthlyConsumptionChart();
         
         const monthSelector = document.getElementById('monthSelector'); 
         monthSelector.innerHTML = ''; 
-        const monthKeys = Object.keys(resultsSC.monthlyData).sort(); // Use one of the results to get keys
+        const monthKeys = Object.keys(resultsSC.monthlyData).sort();
         
         monthKeys.forEach(key => { 
             const option = document.createElement('option'); 
@@ -1201,9 +1181,8 @@ document.addEventListener('DOMContentLoaded', () => {
             monthSelector.appendChild(option); 
         }); 
         
-        // --- Initialize Daily View ---
         if (monthKeys.length > 0) { 
-            monthSelector.value = monthKeys[monthKeys.length - 1]; // Default to the last month
+            monthSelector.value = monthKeys[monthKeys.length - 1];
             updateDaySelector(monthSelector.value); 
         } 
     }
@@ -1240,10 +1219,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Populates the day selector based on the chosen month and updates the monthly summary.
-     * @param {string} monthKey - The selected month key (e.g., "2023-04").
      */
     function updateDaySelector(monthKey) {
-        if (!simulationResults.selfConsumption) return; // Guard against running before simulation
+        if (!simulationResults.selfConsumption) return;
 
         const daySelector = document.getElementById('daySelector');
         daySelector.innerHTML = '';
@@ -1261,6 +1239,11 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'import-minimiser':
                 detailedLogForStrategy = simulationResults.importMinimiser.detailedLog;
                 break;
+            // --- NEW ---
+            case 'historical-forecast':
+                detailedLogForStrategy = simulationResults.historicalForecast.detailedLog;
+                break;
+            // --- END NEW ---
             default:
                 detailedLogForStrategy = simulationResults.selfConsumption.detailedLog;
         }
@@ -1280,7 +1263,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateMonthlySummary(monthKey);
         
-        // Default to showing the first day of the selected month
         if (uniqueDays.length > 0) {
             daySelector.value = uniqueDays[0];
             updateDailyView(uniqueDays[0]);
@@ -1289,10 +1271,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Updates the detailed monthly summary list in the UI.
-     * @param {string} monthKey - The selected month key (e.g., "2023-04").
      */
     function updateMonthlySummary(monthKey) { 
-        if (!simulationResults.selfConsumption) return; // Guard against running before simulation
+        if (!simulationResults.selfConsumption) return;
 
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
@@ -1307,6 +1288,11 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'import-minimiser':
                 resultsForStrategy = simulationResults.importMinimiser;
                 break;
+            // --- NEW ---
+            case 'historical-forecast':
+                resultsForStrategy = simulationResults.historicalForecast;
+                break;
+            // --- END NEW ---
             default:
                 resultsForStrategy = simulationResults.selfConsumption;
         }
@@ -1335,7 +1321,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="flex justify-between"><span>Discharged from Battery:</span><span class="font-mono">${formatKWh(monthSummary.dischargedFromBattery)}</span></li>
         `;
 
-        if ((selectedStrategy === 'export-maximiser' || selectedStrategy === 'balanced-export-maximiser' || selectedStrategy === 'import-minimiser') && monthSummary.missedFullCharges > 0) {
+        // --- MODIFIED ---
+        if ((['export-maximiser', 'balanced-export-maximiser', 'import-minimiser', 'historical-forecast'].includes(selectedStrategy)) && monthSummary.missedFullCharges > 0) {
             summaryHTML += `<li class="border-t border-gray-200 my-2"></li><li class="flex justify-between text-yellow-500" title="The battery did not reach its target SoC on these days during the Force Charge window, likely due to grid import (MIC) or charge rate limits."><span>Missed Full Charges:</span><span class="font-mono font-bold">${monthSummary.missedFullCharges} days</span></li>`;
         }
         document.getElementById('monthlySummaryList').innerHTML = summaryHTML;
@@ -1343,7 +1330,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Updates the daily charts (Energy Flow and SoC) for the selected day.
-     * @param {string} dayStr - The selected day string (e.g., "2023-04-15").
      */
     function updateDailyView(dayStr) { 
         if (!dayStr || !simulationResults.selfConsumption) return; 
@@ -1353,15 +1339,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const strategyDisplayEl = document.getElementById('dailyAnalysisStrategy');
         if (strategyDisplayEl) {
-            let formattedName;
-            if (selectedStrategy === 'self-consumption') formattedName = 'Self-Consumption';
-            else if (selectedStrategy === 'export-maximiser') formattedName = 'Export Maximiser';
-            else if (selectedStrategy === 'balanced-export-maximiser') formattedName = 'Balanced Export Maximiser';
-            else if (selectedStrategy === 'import-minimiser') formattedName = 'Import Minimiser';
+            let formattedName = 'Self-Consumption'; // Default
+            // --- MODIFIED ---
+            switch (selectedStrategy) {
+                case 'export-maximiser': formattedName = 'Export Maximiser'; break;
+                case 'balanced-export-maximiser': formattedName = 'Balanced Export Maximiser'; break;
+                case 'import-minimiser': formattedName = 'Import Minimiser'; break;
+                case 'historical-forecast': formattedName = 'Historical Forecast'; break;
+            }
             strategyDisplayEl.textContent = `(${formattedName})`;
+            // --- END MODIFIED ---
         }
 
         let detailedLogForStrategy;
+        // --- MODIFIED ---
         switch (selectedStrategy) {
             case 'export-maximiser':
                 detailedLogForStrategy = simulationResults.exportMaximiser.detailedLog;
@@ -1372,9 +1363,13 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'import-minimiser':
                 detailedLogForStrategy = simulationResults.importMinimiser.detailedLog;
                 break;
+            case 'historical-forecast':
+                detailedLogForStrategy = simulationResults.historicalForecast.detailedLog;
+                break;
             default:
                 detailedLogForStrategy = simulationResults.selfConsumption.detailedLog;
         }
+        // --- END MODIFIED ---
 
         const dayData = detailedLogForStrategy.filter(log => log.timestamp.toISOString().startsWith(dayStr)); 
         if (dayData.length === 0) return; 
@@ -1388,7 +1383,6 @@ document.addEventListener('DOMContentLoaded', () => {
             batterySoC: dayData.map(d => (d.batterySoC / params.usableCapacity) * 100)
         }; 
         
-        // Destroy old charts before creating new ones to prevent memory leaks
         if (energyChartInstance) energyChartInstance.destroy(); 
         if (socChartInstance) socChartInstance.destroy();
 
@@ -1398,7 +1392,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const socCtx = document.getElementById('socChart').getContext('2d');
         socChartInstance = new Chart(socCtx, getSoCChartConfig(chartSeries));
 
-        // Update navigation button states
         const daySelector = document.getElementById('daySelector'); 
         document.getElementById('prevDayBtn').disabled = daySelector.selectedIndex === 0; 
         document.getElementById('nextDayBtn').disabled = daySelector.selectedIndex === daySelector.options.length - 1; 
@@ -1409,19 +1402,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Generates the optimization chart showing savings vs. battery size.
-     * @param {Array<Object>} optimizationData - Array of {size, savings}.
-     * @param {number} userSelectedSize - The battery size the user originally selected.
      */
     function generateOptimizationChart(optimizationData, userSelectedSize) {
         if (optimizationChartInstance) optimizationChartInstance.destroy();
         const ctx = document.getElementById('optimizationChart').getContext('2d');
     
-        const { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, sizes } = optimizationData;
+        // --- MODIFIED ---
+        const { selfConsumptionResults, exportMaximiserResults, balancedExportMaximiserResults, importMinimiserResults, historicalForecastResults, sizes } = optimizationData;
     
-        // Highlight the data point for the user's currently selected size
         const pointRadii = sizes.map(size => size === userSelectedSize ? 6 : 3);
     
-        const chartOptions = getBaseChartOptions('Annual Savings (€)', true); // Show legend
+        const chartOptions = getBaseChartOptions('Annual Savings (€)', true);
         chartOptions.scales.x.title = { display: true, text: 'Battery Size (kWh)', color: '#4b5563' };
     
         optimizationChartInstance = new Chart(ctx, {
@@ -1432,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Self-Consumption',
                         data: selfConsumptionResults.map(d => d.savings),
-                        borderColor: 'rgba(139, 92, 246, 1)', // Violet-500
+                        borderColor: 'rgba(139, 92, 246, 1)',
                         backgroundColor: 'rgba(139, 92, 246, 1)',
                         pointRadius: pointRadii,
                         pointHoverRadius: 8,
@@ -1442,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Export Maximiser',
                         data: exportMaximiserResults.map(d => d.savings),
-                        borderColor: 'rgba(239, 68, 68, 1)', // Red-500
+                        borderColor: 'rgba(239, 68, 68, 1)',
                         backgroundColor: 'rgba(239, 68, 68, 1)',
                         pointRadius: pointRadii,
                         pointHoverRadius: 8,
@@ -1452,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Balanced Export Maximiser',
                         data: balancedExportMaximiserResults.map(d => d.savings),
-                        borderColor: 'rgba(5, 150, 105, 1)', // Emerald-600
+                        borderColor: 'rgba(5, 150, 105, 1)',
                         backgroundColor: 'rgba(5, 150, 105, 1)',
                         pointRadius: pointRadii,
                         pointHoverRadius: 8,
@@ -1462,17 +1453,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Import Minimiser',
                         data: importMinimiserResults.map(d => d.savings),
-                        borderColor: 'rgba(59, 130, 246, 1)', // Blue-500
+                        borderColor: 'rgba(59, 130, 246, 1)',
                         backgroundColor: 'rgba(59, 130, 246, 1)',
                         pointRadius: pointRadii,
                         pointHoverRadius: 8,
                         fill: false,
                         tension: 0.1
+                    },
+                    // --- NEW ---
+                    {
+                        label: 'Historical Forecast',
+                        data: historicalForecastResults.map(d => d.savings),
+                        borderColor: 'rgba(249, 115, 22, 1)', // Orange-500
+                        backgroundColor: 'rgba(249, 115, 22, 1)',
+                        pointRadius: pointRadii,
+                        pointHoverRadius: 8,
+                        fill: false,
+                        tension: 0.1
                     }
+                    // --- END NEW ---
                 ]
             },
             options: chartOptions
         });
+        // --- END MODIFIED ---
     }
 
     /**
@@ -1507,7 +1511,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Generates the monthly PVGIS generation bar chart.
-     * @param {Array<number>} monthlyData - An array of 12 numbers representing monthly generation.
      */
     function generatePvgisMonthlyChart(monthlyData) {
         if (pvgisMonthlyChartInstance) pvgisMonthlyChartInstance.destroy();
@@ -1525,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Monthly Generation (kWh)',
                     data: monthlyData,
-                    backgroundColor: 'rgba(245, 158, 11, 0.6)', // Amber color
+                    backgroundColor: 'rgba(245, 158, 11, 0.6)',
                     borderColor: 'rgba(245, 158, 11, 1)',
                     borderWidth: 1
                 }]
@@ -1536,12 +1539,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Creates the configuration object for the daily energy flow line chart.
-     * @param {Object} chartData - The data series for the chart.
-     * @returns {Object} A Chart.js configuration object.
      */
     function getEnergyChartConfig(chartData) {
         const minPower = Math.min(...chartData.newNetFlowKw, ...chartData.baseNetKw);
-        const yMin = Math.min(-2, Math.floor(minPower)); // Ensure a minimum range
+        const yMin = Math.min(-2, Math.floor(minPower));
 
         const config = {
             type: 'line',
@@ -1555,7 +1556,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: getBaseChartOptions('Power (kW)', true)
         };
 
-        // Customizations for this specific chart
         config.options.scales.y.min = yMin;
         config.options.scales.x.ticks = { display: false };
         config.options.plugins.legend.position = 'bottom';
@@ -1569,8 +1569,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Creates the configuration object for the daily State of Charge (SoC) bar chart.
-     * @param {Object} chartData - The data series for the chart.
-     * @returns {Object} A Chart.js configuration object.
      */
     function getSoCChartConfig(chartData) {
         const config = {
@@ -1586,7 +1584,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: getBaseChartOptions('Battery SoC (%)', false)
         };
         
-        // Customizations for this specific chart
         config.options.scales.y.min = 0;
         config.options.scales.y.max = 100;
         config.options.scales.y.ticks.callback = value => value + '%';
@@ -1601,9 +1598,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Provides a base configuration for all charts to ensure a consistent look and feel.
-     * @param {string} yAxisTitle - The title for the Y-axis.
-     * @param {boolean} showLegend - Whether to display the chart legend.
-     * @returns {Object} A base Chart.js options object.
      */
     function getBaseChartOptions(yAxisTitle, showLegend = true) {
         const gridColor = 'rgba(0, 0, 0, 0.1)';
@@ -1649,10 +1643,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Exports the detailed simulation log to a CSV file.
      */
     function exportResultsToCSV() { 
-        // Get the log for the currently selected strategy
         const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'self-consumption';
         
         let detailedLog;
+        // --- MODIFIED ---
         switch (selectedStrategy) {
             case 'export-maximiser':
                 detailedLog = simulationResults.exportMaximiser?.detailedLog;
@@ -1663,9 +1657,13 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'import-minimiser':
                 detailedLog = simulationResults.importMinimiser?.detailedLog;
                 break;
+            case 'historical-forecast':
+                detailedLog = simulationResults.historicalForecast?.detailedLog;
+                break;
             default:
                 detailedLog = simulationResults.selfConsumption?.detailedLog;
         }
+        // --- END MODIFIED ---
 
         if (!detailedLog || detailedLog.length === 0) { 
             setStatus("No simulation data to export. Please run a simulation first.", "warning"); 
@@ -1677,7 +1675,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const rows = detailedLog.map(log => {
             const ts = log.timestamp;
-            // Format timestamp to a more standard and sortable format
             const dateStr = `${ts.getUTCFullYear()}-${pad(ts.getUTCMonth() + 1)}-${pad(ts.getUTCDate())} ${pad(ts.getUTCHours())}:${pad(ts.getUTCMinutes())}:${pad(ts.getUTCMinutes() || '00')}`;
             return [ 
                 dateStr, 
@@ -1707,17 +1704,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus(`Exported ${fileName}`, 'success');
     }
 
-    // --- NEW HDF EXPORT FUNCTIONS ---
-
     /**
      * Formats a Date object into the DD-MM-YYYY HH:MM format required for HDF files.
-     * @param {Date} date - The Date object to format.
-     * @returns {string} The formatted date string.
      */
     function formatDateForHDF(date) {
         const pad = (num) => num.toString().padStart(2, '0');
         const day = pad(date.getUTCDate());
-        const month = pad(date.getUTCMonth() + 1); // getUTCMonth() is 0-indexed
+        const month = pad(date.getUTCMonth() + 1);
         const year = date.getUTCFullYear();
         const hours = pad(date.getUTCHours());
         const minutes = pad(date.getUTCMinutes());
@@ -1726,9 +1719,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Exports the simulated grid import/export for a specific strategy as a new HDF-compatible CSV.
-     * @param {'selfConsumption' | 'exportMaximiser' | 'balancedExportMaximiser' | 'importMinimiser'} strategy - The key for the simulation results.
      */
+    // --- MODIFIED ---
     function exportSimulatedHDF(strategy) {
+    // --- END MODIFIED ---
         if (!strategy || !simulationResults[strategy]) {
             setStatus(`No simulation data found for strategy: ${strategy}. Please run a simulation first.`, "warning");
             return;
@@ -1744,15 +1738,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = [];
 
         detailedLog.forEach(log => {
-            // --- *** FIX *** ---
-            // The log.timestamp is the START of the interval (e.g., 01:30).
-            // The HDF format requires the END of the interval (e.g., 02:00).
-            // We must add 30 minutes back before formatting.
             const intervalEndTime = new Date(log.timestamp.getTime() + THIRTY_MINUTES_MS);
             const formattedTimestamp = formatDateForHDF(intervalEndTime);
-            // --- *** END FIX ---
 
-            // Create the Active Import row
             const importRow = [
                 GENERIC_MPRN,
                 GENERIC_METER_ID,
@@ -1761,7 +1749,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 formattedTimestamp
             ].join(',');
 
-            // Create the Active Export row
             const exportRow = [
                 GENERIC_MPRN,
                 GENERIC_METER_ID,
@@ -1789,7 +1776,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus(`Exported ${fileName}`, 'success');
     }
-    // --- END NEW HDF EXPORT FUNCTIONS ---
 
 
     // --- START THE APP --- //
