@@ -210,7 +210,7 @@
 
                 <div class="mb-6">
                     <h3 class="text-lg font-medium text-indigo-600 mb-2">3. Simulation Selection</h3>
-                    <div id="strategy-options" class="space-y-4">
+                    <div class="space-y-4">
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
                             <div class="flex items-center">
                                 <input id="strategy-self-consumption" type="radio" value="self-consumption" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
@@ -224,7 +224,8 @@
                                     <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
                                     <span class="ml-3 font-medium">Export Maximiser</span>
                                 </div>
-                                <div id="desc-export-maximiser" class="strategy-description hidden">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
+                                <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
+                                <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                         </label>
 
                         <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
@@ -242,27 +243,6 @@
                             </div>
                             <div id="desc-import-minimiser" class="strategy-description hidden">Prioritises self-consumption, but *also* force-charges from the grid during cheap rates. It *never* force-discharges, ensuring the battery is full for your own use.</div>
                         </label>
-                        
-                        <!-- NEW STRATEGY RADIO BUTTON -->
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                            <div class="flex items-center">
-                                <input type="radio" id="strategy-hf" name="strategy" value="historical-forecast" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                <label for="strategy-hf" class="ml-3 font-medium text-gray-900">Historical Forecast Charging</label>
-                            </div>
-                            <div id="desc-historical-forecast" class="strategy-description hidden mt-2 p-3 bg-gray-50 rounded-lg border">
-                                <p class="text-sm text-gray-700">
-                                    <strong class="text-indigo-700">Goal:</strong> Intelligently avoids grid costs by using your own historical data as a solar forecast.
-                                </p>
-                                <ul class="list-disc list-inside text-sm text-gray-600 mt-2 space-y-1">
-                                    <li>During cheap rate hours, it looks ahead to the next day's solar generation from your uploaded data.</li>
-                                    <li><strong>If a sunny day is predicted:</strong> It <span class="font-bold">skips charging from the grid</span>, saving battery capacity for free solar energy.</li>
-                                    <li><strong>If a cloudy day is predicted:</strong> It charges from the grid to ensure your needs are met at the lowest cost.</li>
-                                </ul>
-                            </div>
-                        </label>
-                        <!-- END NEW STRATEGY -->
-                        
-                        <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
                     </div>
                 </div>
 
@@ -314,17 +294,14 @@
                 <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
                     <div id="comparisonWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md" role="alert">
                     </div>
-                    <table id="comparisonTable" class="w-full text-left">
+                    <table class="w-full text-left">
                         <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-3 text-left">Metric</th>
-                                <th class="py-3 px-3 text-center">Self-Consumption</th>
-                                <th class="py-3 px-3 text-center">Export Maximiser</th>
-                                <th class="py-3 px-3 text-center">Balanced Export</th>
-                                <th class="py-3 px-3 text-center">Import Minimiser</th>
-                                <!-- NEW TABLE HEADER -->
-                                <th class="py-3 px-3 text-center">Hist. Forecast</th>
-                                <!-- END NEW TABLE HEADER -->
+                            <tr class="border-b-2 border-gray-200">
+                                <th class="p-3 text-sm font-semibold text-gray-500">Metric</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Self-Consumption</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Export Maximiser</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Balanced Export Maximiser</th>
+                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Import Minimiser</th>
                             </tr>
                         </thead>
                         <tbody id="comparisonTableBody" class="divide-y divide-gray-100">
@@ -346,7 +323,7 @@
                             <a href="https://www.energypal.ie" target="_blank" class="text-indigo-600 font-medium hover:underline">www.energypal.ie</a>
                         </p>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <button id="exportHdfScBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
                                 <i data-lucide="download" class="mr-2 h-4 w-4"></i> Self-Consumption HDF
                             </button>
@@ -359,11 +336,6 @@
                             <button id="exportHdfImBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
                                 <i data-lucide="download" class="mr-2 h-4 w-4"></i> Import Minimiser HDF
                             </button>
-                            <!-- NEW HDF EXPORT BUTTON -->
-                            <button id="exportHdfHfBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
-                                <i data-lucide="cloud-sun" class="mr-2 h-4 w-4"></i> Forecast HDF
-                            </button>
-                             <!-- END NEW HDF EXPORT BUTTON -->
                         </div>
                     </div>
                     </div>
@@ -401,3 +373,4 @@
     <script src="script.js" defer></script>
 </body>
 </html>
+
