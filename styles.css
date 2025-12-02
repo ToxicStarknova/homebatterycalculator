@@ -1,0 +1,249 @@
+/* --- Global Variables & Theme --- */
+:root {
+    --primary: #0f172a; /* Slate 900 */
+    --primary-light: #334155; /* Slate 700 */
+    --accent: #3b82f6; /* Blue 500 */
+    --accent-hover: #2563eb; /* Blue 600 */
+    --success: #10b981; /* Emerald 500 */
+    --background: #f8fafc; /* Slate 50 */
+    --surface: #ffffff;
+    --text-main: #1e293b; /* Slate 800 */
+    --text-muted: #64748b; /* Slate 500 */
+    --border: #e2e8f0; /* Slate 200 */
+    --radius: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* --- Base Styles --- */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--background);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* --- Utilities --- */
+.card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+    background-color: var(--accent);
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* --- Form Components --- */
+.input-group {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.input-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-main);
+    margin-bottom: 0.375rem;
+}
+
+.input-field {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    background-color: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    transition: all 0.2s;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* --- Custom Radio Cards --- */
+.radio-card {
+    display: block;
+    position: relative;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #fff;
+}
+
+.radio-card:hover {
+    border-color: var(--accent);
+    background-color: #f0f9ff; /* Light blue tint */
+}
+
+.radio-card:has(input:checked) {
+    border-color: var(--accent);
+    background-color: #eff6ff;
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.radio-card input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+/* --- Tooltips --- */
+.info-button {
+    display: inline-flex;
+    color: var(--text-muted);
+    margin-left: 0.375rem;
+    vertical-align: middle;
+    cursor: help;
+    transition: color 0.2s;
+}
+
+.info-button:hover {
+    color: var(--accent);
+}
+
+.tooltip {
+    position: absolute;
+    z-index: 50;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #fff;
+    background-color: var(--primary);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-lg);
+    max-width: 280px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+}
+
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: var(--primary) transparent transparent transparent;
+}
+
+.input-group:hover .tooltip {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* --- Tariff Table --- */
+.tariff-table {
+    width: 100%;
+    font-size: 0.875rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.tariff-table th {
+    background-color: #f1f5f9;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.tariff-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+}
+
+.tariff-table tr:last-child td {
+    border-bottom: none;
+}
+
+.tariff-table .rate-input {
+    width: 100%;
+    max-width: 80px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    text-align: center;
+}
+
+/* --- Header --- */
+.app-header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+}
+
+/* --- Dashboard Layout --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Results --- */
+.metric-card {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}

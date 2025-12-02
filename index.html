@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,370 +8,394 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            // Tailwind config options can be added here if needed.
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 50: '#f8fafc', 900: '#0f172a' },
+                        blue: { 500: '#3b82f6', 600: '#2563eb' }
+                    }
+                }
+            }
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-
-        /* --- Custom Component Styles --- */
-        /* These classes complement Tailwind by creating reusable components. */
-
-        /* Form Inputs & Labels */
-        .input-group {
-            position: relative;
-        }
-        .input-label {
-            display: inline-block;
-            margin-bottom: 0.25rem;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #374151;
-        }
-        .input-field {
-            display: block;
-            width: 100%;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .input-field:focus {
-            outline: none;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
-        }
-
-        /* Info Buttons & Tooltips */
-        .info-button {
-            display: inline-flex;
-            color: #6b7280;
-            margin-left: 0.25rem;
-            vertical-align: middle;
-            cursor: pointer;
-        }
-        .info-button:hover { color: #4f46e5; }
-        .tooltip {
-            position: absolute;
-            z-index: 10;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.75rem;
-            color: #ffffff;
-            background-color: #1f2937;
-            border-radius: 0.375rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            max-width: 250px;
-        }
-
-        /* Tariff Tables */
-        .tariff-table {
-            width: 100%;
-            font-size: 0.875rem;
-            border-collapse: collapse;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.375rem;
-            overflow: hidden;
-        }
-        .tariff-table th, .tariff-table td { padding: 0.5rem; text-align: left; }
-        .tariff-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
-        .tariff-table tbody tr:not(:last-child) { border-bottom: 1px solid #e5e7eb; }
-        .tariff-table .rate-input { padding: 0.25rem; text-align: center; max-width: 80px; }
-        .tariff-table .force-cb-label { display: flex; justify-content: center; align-items: center; cursor: pointer; }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-slate-100 text-gray-900">
+
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- Header -->
+    <header class="app-header bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i data-lucide="zap" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">BatterySim <span
+                            class="text-blue-600">Pro</span></h1>
+                    <p class="text-xs text-slate-500 font-medium">Home Energy Savings Calculator</p>
+                </div>
+            </div>
+            <div class="mt-4 md:mt-0 text-sm text-slate-500">
+                Simulate performance based on your real ESB data
+            </div>
+        </div>
+    </header>
 
     <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-12 relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-12 rounded-xl shadow-lg">
-            <h1 class="text-4xl font-bold">Home Battery Savings Calculator</h1>
-            <p class="mt-2 text-lg text-indigo-200 max-w-3xl mx-auto">Upload your ESB Networks HDF file to simulate battery performance and calculate your potential savings.</p>
-        </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <form id="config-form" class="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg self-start sticky top-8">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center"><i data-lucide="settings-2" class="mr-2"></i>Configuration</h2>
-                
-                <button type="button" id="calculateBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 flex items-center justify-center disabled:opacity-50"><i data-lucide="calculator" class="mr-2"></i>Run Simulation</button>
-                <p id="status" class="text-center mt-2 mb-4 text-sm text-gray-500"></p>
+        <div class="dashboard-grid">
 
-                <div class="pt-4 mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">1. Upload HDF File</h3>
-                    <div class="input-group">
-                        <label for="csvFile" class="input-label">ESB Harmonised Data File (CSV)</label>
-                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                        <p class="text-xs text-indigo-700 font-semibold mt-1">Important: On the ESB website, please download the file with "30-minute readings in calculated kWh".</p>
-                        <p class="text-xs text-gray-500 mt-1">For security, you can delete the MPRN and Serial Number columns.</p>
+            <!-- Sidebar: Configuration -->
+            <aside class="space-y-6">
+                <form id="config-form" class="card p-6 sticky top-24">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <i data-lucide="sliders" class="mr-2 h-5 w-5 text-blue-500"></i> Configuration
+                        </h2>
                     </div>
-                </div>
 
-                <div class="pt-4 mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">1.5. Solar PV Generation Data</h3>
-                    <div class="space-y-4">
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                            <div class="flex items-center">
-                                <input id="dataSourceHdf" type="radio" value="hdf" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
-                                <span class="ml-3 font-medium">Use data from HDF file</span>
-                            </div>
-                            <div class="strategy-description">Uses the solar generation (Active Export) data found in your uploaded HDF file.</div>
-                        </label>
+                    <!-- Action Button -->
+                    <button type="button" id="calculateBtn"
+                        class="btn-primary w-full mb-2 shadow-lg shadow-blue-500/30">
+                        <i data-lucide="play" class="mr-2 h-4 w-4 fill-current"></i> Run Simulation
+                    </button>
+                    <p id="status" class="text-center mb-6 text-xs text-slate-500 font-medium min-h-[1.25rem]"></p>
 
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                               <div class="flex items-center">
-                                    <input id="dataSourcePvgis" type="radio" value="pvgis" name="dataSource" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                    <span class="ml-3 font-medium">Simulate New PV System</span>
+                    <!-- Section 1: Data Source -->
+                    <div class="mb-8">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">1. Data Source</h3>
+
+                        <div class="input-group">
+                            <label for="csvFile" class="input-label">ESB Data File (HDF)</label>
+                            <input type="file" id="csvFile" accept=".csv"
+                                class="input-field text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <p class="text-xs text-slate-500 mt-2 leading-relaxed">Download "30-minute readings in
+                                calculated kWh" from ESB Networks.</p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <label class="radio-card">
+                                <div class="flex items-center">
+                                    <input id="dataSourceHdf" type="radio" value="hdf" name="dataSource" checked>
+                                    <span class="ml-3 font-medium text-sm">Use HDF Solar Data</span>
                                 </div>
-                                <div class="strategy-description">Ignores generation data in your HDF and simulates a new solar PV system. Your HDF's consumption data is still used.</div>
-                        </label>
-                    </div>
+                            </label>
 
-                    <div id="pvgis-options" class="hidden mt-4 space-y-4 p-4 border-l-4 border-indigo-400 bg-indigo-50">
-                        <p class="text-sm text-gray-700">Upload the hourly PV generation data CSV file you downloaded from PVGIS.</p>
-                        <div class="input-group">
-                            <label for="pvgisFile" class="input-label">PVGIS Hourly Data File (CSV)</label>
-                            <input type="file" id="pvgisFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                        </div>
-                        <div class="text-xs text-gray-600">
-                            <p class="font-semibold">How to get the file:</p>
-                            <ol class="list-decimal list-inside mt-1 space-y-1">
-                                <li>Go to the <a href="https://re.jrc.ec.europa.eu/pvg_tools/en/tools.html#PVP" target="_blank" class="text-indigo-600 hover:underline">PVGIS Hourly Radiation Tool</a>.</li>
-                                <li>Enter your location and PV system details.</li>
-                                <li>Check the box for "PV electricity generation".</li>
-                                <li class="!mt-2"><strong>Note on Azimuth:</strong> PVGIS uses 0° for South, -90° for East, and 90° for West.</li>
-                                <li>Click "Download CSV" to get the file.</li>
-                            </ol>
-                        </div>
-                        <div id="pvgis-summary" class="hidden mt-4 pt-4 border-t border-indigo-200">
-                            <h4 class="font-semibold text-sm mb-2 text-gray-800">PVGIS File Summary</h4>
-                            <div id="pvgis-summary-metrics" class="text-xs text-gray-600 space-y-1 mb-4">
-                            </div>
-                            <div class="relative h-48">
-                                <canvas id="pvgisMonthlyChart"></canvas>
-                            </div>
-                            <p class="text-xs text-center text-gray-500 mt-1">This chart shows the estimated monthly generation from your uploaded file.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="my-6 border-gray-200">
-
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">2. System Technical Details</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="input-group">
-                            <label for="batterySize" class="input-label">Battery Capacity (kWh)</label>
-                            <input type="number" id="batterySize" class="input-field" value="10">
-                        </div>
-                        <div class="input-group">
-                            <label for="usableCapacity" class="input-label">Usable Capacity (%)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-usable-capacity"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="usableCapacity" class="input-field" value="90" min="0" max="100">
-                            <div id="tooltip-usable-capacity" role="tooltip" class="tooltip hidden">The percentage of the total battery capacity you can actually use, as limited by the manufacturer to protect the battery.</div>
-                        </div>
-                        <div class="input-group">
-                            <label for="chargeRate" class="input-label">Charge/Discharge (kW)</label>
-                            <input type="number" id="chargeRate" class="input-field" value="5">
-                        </div>
-                        <div class="input-group">
-                            <label for="roundtripEfficiency" class="input-label">Efficiency (%)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-efficiency"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="roundtripEfficiency" class="input-field" value="90" min="0" max="100">
-                                <div id="tooltip-efficiency" role="tooltip" class="tooltip hidden">The round-trip efficiency. Energy is lost during both charging and discharging. 90% is a typical value.</div>
-                        </div>
-                        <div class="input-group">
-                            <label for="mic" class="input-label">Max Import (kW)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-mic"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="mic" class="input-field" value="12">
-                                <div id="tooltip-mic" role="tooltip" class="tooltip hidden">Your home's maximum import capacity from the grid, set by your provider (e.g., 12kW for standard domestic).</div>
-                        </div>
-                        <div class="input-group">
-                            <label for="mec" class="input-label">Max Export (kW)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-mec"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="mec" class="input-field" value="6">
-                            <div id="tooltip-mec" role="tooltip" class="tooltip hidden">Your home's maximum allowed export power to the grid. Often limited by the inverter or network operator (e.g., 6kW).</div>
-                        </div>
-                        <div class="input-group">
-                            <label for="minSoc" class="input-label">Min SoC (%)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-min-soc"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="minSoc" class="input-field" value="10" min="0" max="100">
-                            <div id="tooltip-min-soc" role="tooltip" class="tooltip hidden">The minimum charge level you want to keep in the battery for backup or to prolong its life.</div>
-                        </div>
-                        <div class="input-group">
-                            <label for="maxSoc" class="input-label">Max SoC (%)</label>
-                            <button type="button" class="info-button" data-tooltip-target="tooltip-max-soc"><i data-lucide="info" class="h-4 w-4"></i></button>
-                            <input type="number" id="maxSoc" class="input-field" value="100" min="0" max="100">
-                            <div id="tooltip-max-soc" role="tooltip" class="tooltip hidden">The maximum charge level. Setting this below 100% can help extend battery lifespan but reduces usable capacity.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="my-6 border-gray-200">
-
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">3. Simulation Selection</h3>
-                    <div class="space-y-4">
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                            <div class="flex items-center">
-                                <input id="strategy-self-consumption" type="radio" value="self-consumption" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
-                                <span class="ml-3 font-medium">Self-Consumption</span>
-                            </div>
-                            <div id="desc-self-consumption" class="strategy-description hidden">Prioritises using your own solar power to reduce grid imports. The battery stores excess solar during the day and discharges to power your home at night.</div>
-                        </label>
-
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                               <div class="flex items-center">
-                                    <input id="strategy-export-maximiser" type="radio" value="export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                    <span class="ml-3 font-medium">Export Maximiser</span>
+                            <label class="radio-card">
+                                <div class="flex items-center">
+                                    <input id="dataSourcePvgis" type="radio" value="pvgis" name="dataSource">
+                                    <span class="ml-3 font-medium text-sm">Simulate New Solar PV</span>
                                 </div>
-                                <div id="desc-export-maximiser" class="strategy-description">Charges the battery from the grid during designated cheap-rate hours. It will attempt to 'force discharge' by exporting to the grid right before the cheap window starts to make space.</div>
-                                <p id="force-charge-warning" class="text-red-500 text-sm font-semibold mt-2 hidden">Please select your desired force-charge times in the Hourly Import Tariff table below.</p>
-                        </label>
-
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                            <div class="flex items-center">
-                                <input id="strategy-balanced-export-maximiser" type="radio" value="balanced-export-maximiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                <span class="ml-3 font-medium">Balanced Export Maximiser</span>
-                            </div>
-                            <div id="desc-balanced-export-maximiser" class="strategy-description hidden">A balanced version of the Export Maximiser. It avoids pre-emptive grid export during the winter months (Nov, Dec, Jan, Feb) to preserve battery for higher heating loads.</div>
-                        </label>
-                        
-                        <label class="block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-400">
-                            <div class="flex items-center">
-                                <input id="strategy-import-minimiser" type="radio" value="import-minimiser" name="strategy" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                <span class="ml-3 font-medium">Import Minimiser</span>
-                            </div>
-                            <div id="desc-import-minimiser" class="strategy-description hidden">Prioritises self-consumption, but *also* force-charges from the grid during cheap rates. It *never* force-discharges, ensuring the battery is full for your own use.</div>
-                        </label>
-                    </div>
-                </div>
-
-                <hr class="my-6 border-gray-200">
-
-                <div>
-                    <h3 class="text-lg font-medium text-indigo-600 mb-2">4. Financials</h3>
-                    <p class="text-xs text-gray-500 mb-4">Ensure all costs and unit prices include VAT.</p>
-                    <p class="text-xs text-indigo-700 font-semibold mb-4">Note: Default rates are pre-set to the Pinergy EV tariff for demonstration.</p>
-                            <div class="input-group"><label for="systemCost" class="input-label">Total System Cost (€)</label><input type="number" id="systemCost" class="input-field" value="8000" step="100"></div>
-                            <div id="importTariffSection" class="border-t pt-4 mt-4 border-gray-200">
-                                <h4 class="font-semibold mb-2">Import Tariff</h4>
-                                    <div class="grid grid-cols-2 gap-4 mb-4">
-                                        <label for="importTariffFlat" class="flex items-center cursor-pointer">
-                                            <input type="radio" id="importTariffFlat" name="importTariffType" value="flat" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 block text-sm">Flat Rate</span>
-                                        </label>
-                                        <label for="importTariffHourly" class="flex items-center cursor-pointer">
-                                            <input type="radio" id="importTariffHourly" name="importTariffType" value="hourly" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 block text-sm">Hourly</span>
-                                         </label>
-                                    </div>
-                                <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice" class="input-field" value="0.35" step="0.01"></div>
-                                <div id="importHourlyRateSection"><div id="hourlyImportGrid"></div></div>
-                            </div>
-                                <div id="exportTariffSection" class="border-t pt-4 mt-4 border-gray-200">
-                                <h4 class="font-semibold mb-2">Export Tariff</h4>
-                                    <div class="grid grid-cols-2 gap-4 mb-4">
-                                         <label for="exportTariffFlat" class="flex items-center cursor-pointer">
-                                            <input type="radio" id="exportTariffFlat" name="exportTariffType" value="flat" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 block text-sm">Flat Rate</span>
-                                         </label>
-                                         <label for="exportTariffHourly" class="flex items-center cursor-pointer">
-                                            <input type="radio" id="exportTariffHourly" name="exportTariffType" value="hourly" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 block text-sm">Hourly</span>
-                                         </label>
-                                    </div>
-                                <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field" value="0.25" step="0.01"></div>
-                                <div id="exportHourlyRateSection" class="hidden"><div id="hourlyExportGrid"></div></div>
-                            </div>
-                </div>
-            </form>
-
-            <div id="resultsPanel" class="lg:col-span-2 hidden">
-                <h2 class="text-3xl font-bold mb-4 text-gray-800">"Before" Scenario Summary</h2>
-                <div id="beforeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"></div>
-
-                <h2 class="text-3xl font-bold mb-4 text-gray-800">"After" Scenario Annual Summary</h2>
-                <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
-                    <div id="comparisonWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md" role="alert">
-                    </div>
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="border-b-2 border-gray-200">
-                                <th class="p-3 text-sm font-semibold text-gray-500">Metric</th>
-                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Self-Consumption</th>
-                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Export Maximiser</th>
-                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Balanced Export Maximiser</th>
-                                <th class="p-3 text-sm font-semibold text-gray-800 text-center">Import Minimiser</th>
-                            </tr>
-                        </thead>
-                        <tbody id="comparisonTableBody" class="divide-y divide-gray-100">
-                        </tbody>
-                    </table>
-                    <p class="text-xs text-center text-gray-500 mt-2">Select a strategy in the configuration panel to view its detailed daily performance below.</p>
-
-                    <div class="mt-6 pt-6 border-t border-gray-200">
-                        <h4 class="text-lg font-semibold text-center text-gray-700 mb-4">Download HDF for Full Financial Analysis</h4>
-                        
-                        <div class="bg-gray-100 p-4 rounded-lg text-xs text-gray-700 mb-4 space-y-2">
-                            <p><strong>Please Note:</strong> Our "Annual Savings" figures are based *only* on unit rates for a quick comparison. They do not include standing charges, PSO levies, or other fees.</p>
-                            <p>For a complete financial analysis that includes all charges, please use the generated HDF files on a dedicated comparison site.</p>
-                            <p><strong>Privacy:</strong> The HDF files you download are anonymous and use a generic MPRN/Meter ID, not your real ones.</p>
+                            </label>
                         </div>
-                        
-                        <p class="text-sm text-center text-gray-600 mb-5">
-                            Upload your simulated HDF to a comparison site like: 
-                            <a href="https://www.energypal.ie" target="_blank" class="text-indigo-600 font-medium hover:underline">www.energypal.ie</a>
-                        </p>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <button id="exportHdfScBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
-                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Self-Consumption HDF
-                            </button>
-                            <button id="exportHdfEmBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
-                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Export Maximiser HDF
-                            </button>
-                            <button id="exportHdfBemBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
-                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Balanced Export HDF
-                            </button>
-                            <button id="exportHdfImBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center text-sm">
-                                <i data-lucide="download" class="mr-2 h-4 w-4"></i> Import Minimiser HDF
-                            </button>
+                        <!-- PVGIS Options -->
+                        <div id="pvgis-options" class="hidden mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="input-group">
+                                <label for="pvgisFile" class="input-label">PVGIS Hourly CSV</label>
+                                <input type="file" id="pvgisFile" accept=".csv" class="input-field text-sm">
+                            </div>
+                            <a href="https://re.jrc.ec.europa.eu/pvg_tools/en/tools.html#PVP" target="_blank"
+                                class="text-xs text-blue-600 hover:underline flex items-center mt-2">
+                                Open PVGIS Tool <i data-lucide="external-link" class="ml-1 h-3 w-3"></i>
+                            </a>
+
+                            <div id="pvgis-summary" class="hidden mt-4 pt-4 border-t border-slate-200">
+                                <div class="relative h-32">
+                                    <canvas id="pvgisMonthlyChart"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Section 2: System Specs -->
+                    <div class="mb-8">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">2. System Specs</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="input-group">
+                                <label for="batterySize" class="input-label">Size (kWh)</label>
+                                <input type="number" id="batterySize" class="input-field" value="10">
+                            </div>
+                            <div class="input-group relative">
+                                <label class="input-label flex items-center">
+                                    Usable % <i data-lucide="info" class="h-3 w-3 ml-1 text-slate-400"></i>
+                                    <div class="tooltip">Percentage of total capacity available for use.</div>
+                                </label>
+                                <input type="number" id="usableCapacity" class="input-field" value="90">
+                            </div>
+                            <div class="input-group">
+                                <label for="chargeRate" class="input-label">Power (kW)</label>
+                                <input type="number" id="chargeRate" class="input-field" value="5">
+                            </div>
+                            <div class="input-group relative">
+                                <label class="input-label flex items-center">
+                                    Eff. % <i data-lucide="info" class="h-3 w-3 ml-1 text-slate-400"></i>
+                                    <div class="tooltip">Round-trip efficiency (charging + discharging losses).</div>
+                                </label>
+                                <input type="number" id="roundtripEfficiency" class="input-field" value="90">
+                            </div>
+                        </div>
+
+                        <!-- Advanced Toggle -->
+                        <details class="text-sm text-slate-500 mt-2">
+                            <summary class="cursor-pointer hover:text-blue-600 font-medium">Advanced Settings</summary>
+                            <div class="grid grid-cols-2 gap-4 mt-3 pl-2 border-l-2 border-slate-200">
+                                <div class="input-group">
+                                    <label for="mic" class="input-label">Max Import</label>
+                                    <input type="number" id="mic" class="input-field" value="12">
+                                </div>
+                                <div class="input-group">
+                                    <label for="mec" class="input-label">Max Export</label>
+                                    <input type="number" id="mec" class="input-field" value="6">
+                                </div>
+                                <div class="input-group">
+                                    <label for="minSoc" class="input-label">Min SoC %</label>
+                                    <input type="number" id="minSoc" class="input-field" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label for="maxSoc" class="input-label">Max SoC %</label>
+                                    <input type="number" id="maxSoc" class="input-field" value="100">
+                                </div>
+                            </div>
+                        </details>
                     </div>
 
-                <div id="optimizationChartContainer" class="bg-white p-6 rounded-lg shadow-lg mb-8 hidden">
-                    <h3 class="text-xl font-semibold text-center mb-4">Battery Size vs. Annual Savings</h3>
-                    <div class="relative h-80"><canvas id="optimizationChart"></canvas></div>
-                    <p class="text-xs text-center text-gray-500 mt-2">This chart compares the estimated annual savings for all simulation strategies across different battery sizes. The larger dots indicate your currently selected system size.</p>
-                </div>
+                    <!-- Section 3: Strategy -->
+                    <div class="mb-8">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">3. Strategy</h3>
+                        <div class="space-y-3">
+                            <label class="radio-card">
+                                <div class="flex items-center mb-1">
+                                    <input id="strategy-self-consumption" type="radio" value="self-consumption"
+                                        name="strategy" checked>
+                                    <span class="ml-3 font-semibold text-sm">Self-Consumption</span>
+                                </div>
+                                <p class="text-xs text-slate-500 ml-7">Maximize use of your own solar power.</p>
+                            </label>
 
-                <hr class="my-12 border-gray-300"/>
+                            <label class="radio-card">
+                                <div class="flex items-center mb-1">
+                                    <input id="strategy-export-maximiser" type="radio" value="export-maximiser"
+                                        name="strategy">
+                                    <span class="ml-3 font-semibold text-sm">Export Maximiser</span>
+                                </div>
+                                <p class="text-xs text-slate-500 ml-7">Force charge/discharge based on tariffs.</p>
+                            </label>
 
-                <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
-                    <h3 class="text-xl font-semibold text-center mb-4">Total Monthly Consumption (Last 12 Months)</h3>
-                    <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
-                </div>
-                
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-3xl font-bold text-gray-800">Daily Analysis <span id="dailyAnalysisStrategy" class="text-xl font-medium text-indigo-600 ml-2"></span></h2>
-                    <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition-all duration-200 flex items-center justify-center text-sm"><i data-lucide="download" class="mr-2 h-4 w-4"></i>Export to CSV</button>
-                </div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="monthSelector" class="input-label">Select Month</label><select id="monthSelector" class="input-field"></select></div><div class="input-group"><label for="daySelector" class="input-label">Select Day</label><select id="daySelector" class="input-field"></select></div></div><div class="grid grid-cols-1 gap-8"><div class="bg-white p-6 rounded-lg shadow-lg">
-                    <div class="flex items-center justify-center mb-2 relative">
-                        <button id="prevDayBtn" class="nav-btn absolute left-0"><i data-lucide="arrow-left" class="h-5 w-5"></i></button>
-                        <h3 class="text-xl font-semibold text-center">Energy Flow for <span id="chartDate"></span></h3>
-                        <button id="nextDayBtn" class="nav-btn absolute right-0"><i data-lucide="arrow-right" class="h-5 w-5"></i></button>
+                            <label class="radio-card">
+                                <div class="flex items-center mb-1">
+                                    <input id="strategy-balanced-export-maximiser" type="radio"
+                                        value="balanced-export-maximiser" name="strategy">
+                                    <span class="ml-3 font-semibold text-sm">Balanced Export</span>
+                                </div>
+                                <p class="text-xs text-slate-500 ml-7">Smart export with winter protection.</p>
+                            </label>
+
+                            <label class="radio-card">
+                                <div class="flex items-center mb-1">
+                                    <input id="strategy-import-minimiser" type="radio" value="import-minimiser"
+                                        name="strategy">
+                                    <span class="ml-3 font-semibold text-sm">Import Minimiser</span>
+                                </div>
+                                <p class="text-xs text-slate-500 ml-7">Force charge cheap, but never force export.</p>
+                            </label>
+                        </div>
                     </div>
-                    <div class="relative h-[300px] mb-2"><canvas id="energyChart"></canvas></div>
-                    <div class="relative h-[120px]"><canvas id="socChart"></canvas></div>
-                </div><div class="result-card p-4"><h3 class="font-semibold text-lg mb-2">Summary for <span id="summaryMonth"></span></h3><ul class="space-y-2 text-sm" id="monthlySummaryList"></ul></div></div>
+
+                    <!-- Section 4: Financials -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">4. Financials</h3>
+                        <div class="input-group">
+                            <label for="systemCost" class="input-label">System Cost (€)</label>
+                            <input type="number" id="systemCost" class="input-field" value="8000" step="100">
+                        </div>
+
+                        <!-- Import Tariff -->
+                        <div id="importTariffSection" class="mt-4 pt-4 border-t border-slate-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-sm font-semibold">Import Rates</h4>
+                                <div class="flex space-x-3 text-xs">
+                                    <label class="flex items-center cursor-pointer"><input type="radio"
+                                            name="importTariffType" value="flat" class="mr-1"> Flat</label>
+                                    <label class="flex items-center cursor-pointer"><input type="radio"
+                                            name="importTariffType" value="hourly" checked class="mr-1"> Hourly</label>
+                                </div>
+                            </div>
+                            <div id="importFlatRateSection" class="hidden"><input type="number" id="importPrice"
+                                    class="input-field" value="0.35" step="0.01"></div>
+                            <div id="importHourlyRateSection">
+                                <div id="hourlyImportGrid"></div>
+                            </div>
+                        </div>
+
+                        <!-- Export Tariff -->
+                        <div id="exportTariffSection" class="mt-4 pt-4 border-t border-slate-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-sm font-semibold">Export Rates</h4>
+                                <div class="flex space-x-3 text-xs">
+                                    <label class="flex items-center cursor-pointer"><input type="radio"
+                                            name="exportTariffType" value="flat" checked class="mr-1"> Flat</label>
+                                    <label class="flex items-center cursor-pointer"><input type="radio"
+                                            name="exportTariffType" value="hourly" class="mr-1"> Hourly</label>
+                                </div>
+                            </div>
+                            <div id="exportFlatRateSection"><input type="number" id="exportPrice" class="input-field"
+                                    value="0.25" step="0.01"></div>
+                            <div id="exportHourlyRateSection" class="hidden">
+                                <div id="hourlyExportGrid"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </aside>
+
+            <!-- Main Content: Results -->
+            <main id="resultsPanel" class="hidden space-y-8">
+
+                <!-- Summary Cards -->
+                <section>
+                    <h2 class="text-xl font-bold text-slate-800 mb-4">Current Status</h2>
+                    <div id="beforeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- Comparison Table -->
+                <section class="card p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-bold text-slate-800">Strategy Comparison</h2>
+                        <span class="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded">Annual
+                            Estimates</span>
+                    </div>
+
+                    <div id="comparisonWarning"
+                        class="hidden bg-amber-50 border-l-4 border-amber-400 text-amber-700 p-4 mb-4 text-sm rounded-r"
+                        role="alert"></div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-200">
+                                    <th class="p-3 font-semibold text-slate-500">Metric</th>
+                                    <th class="p-3 font-semibold text-slate-800 text-center">Self-Consumption</th>
+                                    <th class="p-3 font-semibold text-slate-800 text-center">Export Max</th>
+                                    <th class="p-3 font-semibold text-slate-800 text-center">Balanced Export</th>
+                                    <th class="p-3 font-semibold text-slate-800 text-center">Import Min</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparisonTableBody" class="divide-y divide-slate-100">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Download Actions -->
+                    <div class="mt-8 pt-6 border-t border-slate-100 bg-slate-50 -mx-6 -mb-6 p-6 rounded-b-lg">
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div class="text-xs text-slate-500 max-w-md">
+                                <p class="font-semibold mb-1">Download HDF for detailed analysis</p>
+                                <p>Upload these files to <a href="https://www.energypal.ie" target="_blank"
+                                        class="text-blue-600 hover:underline">EnergyPal.ie</a> for exact savings
+                                    calculations including all levies.</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 w-full md:w-auto">
+                                <button id="exportHdfScBtn"
+                                    class="px-3 py-2 bg-white border border-slate-300 rounded text-xs font-semibold hover:bg-slate-50 text-slate-700 transition">Self-Cons.
+                                    HDF</button>
+                                <button id="exportHdfEmBtn"
+                                    class="px-3 py-2 bg-white border border-slate-300 rounded text-xs font-semibold hover:bg-slate-50 text-slate-700 transition">Export
+                                    Max HDF</button>
+                                <button id="exportHdfBemBtn"
+                                    class="px-3 py-2 bg-white border border-slate-300 rounded text-xs font-semibold hover:bg-slate-50 text-slate-700 transition">Balanced
+                                    HDF</button>
+                                <button id="exportHdfImBtn"
+                                    class="px-3 py-2 bg-white border border-slate-300 rounded text-xs font-semibold hover:bg-slate-50 text-slate-700 transition">Import
+                                    Min HDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Charts -->
+                <section class="grid grid-cols-1 gap-8">
+                    <div id="optimizationChartContainer" class="card p-6 hidden">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Battery Size Optimization</h3>
+                        <div class="relative h-80"><canvas id="optimizationChart"></canvas></div>
+                    </div>
+
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Monthly Consumption</h3>
+                        <div class="relative h-64"><canvas id="monthlyConsumptionChart"></canvas></div>
+                    </div>
+                </section>
+
+                <!-- Daily Analysis -->
+                <section class="card p-6">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Daily Analysis</h2>
+                            <p class="text-sm text-slate-500">Deep dive into <span id="dailyAnalysisStrategy"
+                                    class="font-medium text-blue-600"></span> performance</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="input-group mb-0 w-32">
+                                <select id="monthSelector" class="input-field py-1 text-sm"></select>
+                            </div>
+                            <div class="input-group mb-0 w-24">
+                                <select id="daySelector" class="input-field py-1 text-sm"></select>
+                            </div>
+                            <button id="exportBtn" class="btn-primary py-1 px-3 text-sm h-[34px]"><i
+                                    data-lucide="download" class="h-4 w-4"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <button id="prevDayBtn" class="p-1 hover:bg-slate-200 rounded transition"><i
+                                    data-lucide="chevron-left" class="h-5 w-5 text-slate-600"></i></button>
+                            <h3 class="font-semibold text-slate-700" id="chartDate">Select a date</h3>
+                            <button id="nextDayBtn" class="p-1 hover:bg-slate-200 rounded transition"><i
+                                    data-lucide="chevron-right" class="h-5 w-5 text-slate-600"></i></button>
+                        </div>
+                        <div class="relative h-[300px] mb-4"><canvas id="energyChart"></canvas></div>
+                        <div class="relative h-[100px]"><canvas id="socChart"></canvas></div>
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <h3 class="font-semibold text-blue-900 text-sm mb-2">Monthly Summary (<span
+                                id="summaryMonth"></span>)</h3>
+                        <ul class="space-y-1 text-sm text-blue-800" id="monthlySummaryList"></ul>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- Welcome State -->
+            <div id="welcomePanel"
+                class="flex flex-col items-center justify-center text-center p-12 bg-white rounded-xl border border-dashed border-slate-300 h-[600px]">
+                <div class="bg-blue-50 p-6 rounded-full mb-6">
+                    <i data-lucide="bar-chart-2" class="h-12 w-12 text-blue-500"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">Ready to Analyze?</h2>
+                <p class="text-slate-500 max-w-md mb-8">Upload your ESB HDF file in the configuration panel to start
+                    simulating your battery savings.</p>
+                <div class="flex gap-2 text-xs text-slate-400">
+                    <span class="flex items-center"><i data-lucide="shield-check" class="h-3 w-3 mr-1"></i>
+                        Secure</span>
+                    <span class="flex items-center"><i data-lucide="cpu" class="h-3 w-3 mr-1"></i> Client-side
+                        processing</span>
+                </div>
             </div>
-            <div id="welcomePanel" class="lg:col-span-2 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner"><div class="text-center p-10"><i data-lucide="line-chart" class="mx-auto h-20 w-20 text-indigo-300"></i><h2 class="mt-4 text-2xl font-semibold">Ready to Analyze Your Energy Future?</h2><p class="mt-2 text-gray-500">Upload your data and configure your system on the left to get started.</p></div></div>
+
         </div>
     </div>
-    
+
     <script src="script.js" defer></script>
 </body>
-</html>
 
+</html>

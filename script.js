@@ -346,17 +346,301 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {string} message - The text to display.
      * @param {'info'|'loading'|'success'|'warning'|'error'} type - The type of message, for styling.
      */
+    /**
+     * Sets a message in the status bar UI element.
+     * @param {string} message - The text to display.
+     * @param {'info'|'loading'|'success'|'warning'|'error'} type - The type of message, for styling.
+     */
     function setStatus(message, type = 'info') {
         const statusEl = document.getElementById('status');
         statusEl.textContent = message;
         // Reset classes and apply new ones based on type
-        statusEl.className = 'text-center mt-2 mb-4 text-sm font-medium';
+        statusEl.className = 'text-center mb-6 text-xs font-medium min-h-[1.25rem]';
         switch (type) {
-            case 'error': statusEl.classList.add('text-red-500'); break;
-            case 'success': statusEl.classList.add('text-green-500'); break;
-            case 'warning': statusEl.classList.add('text-yellow-500'); break;
-            case 'loading': statusEl.classList.add('text-gray-500'); break;
-            default: statusEl.classList.add('text-gray-700'); break;
+            case 'error': statusEl.classList.add('text-red-600'); break;
+            case 'success': statusEl.classList.add('text-emerald-600'); break;
+            case 'warning': statusEl.classList.add('text-amber-600'); break;
+            case 'loading': statusEl.classList.add('text-slate-500', 'animate-pulse'); break;
+            default: statusEl.classList.add('text-slate-500'); break;
+        }
+    }
+
+    // ... (rest of the file) ...
+
+    /**
+     * Generates or updates the main energy flow chart.
+     * @param {Array<Object>} dailyData - The data for the selected day.
+     */
+    function generateEnergyChart(dailyData) {
+        const ctx = document.getElementById('energyChart').getContext('2d');
+        const labels = dailyData.map(d => d.timeLabel);
+
+        const datasets = [
+            {
+                label: 'Solar Generation',
+                data: dailyData.map(d => d.generation),
+                backgroundColor: 'rgba(234, 179, 8, 0.2)', // Yellow-500
+                borderColor: 'rgba(234, 179, 8, 1)',
+                borderWidth: 1,
+                fill: true,
+                order: 2
+            },
+            {
+                label: 'House Consumption',
+                data: dailyData.map(d => d.consumption),
+                backgroundColor: 'rgba(239, 68, 68, 0.2)', // Red-500
+                borderColor: 'rgba(239, 68, 68, 1)',
+                borderWidth: 1,
+                fill: true,
+                order: 3
+            },
+            {
+                label: 'Battery Discharge',
+                data: dailyData.map(d => d.batteryDischarge),
+                backgroundColor: 'rgba(16, 185, 129, 0.6)', // Emerald-500
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 1,
+                order: 1
+            },
+            {
+                label: 'Grid Import',
+                data: dailyData.map(d => d.gridImport),
+                backgroundColor: 'rgba(59, 130, 246, 0.6)', // Blue-500
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 1,
+                order: 4
+            },
+            {
+                label: 'Grid Export',
+                data: dailyData.map(d => -d.gridExport), // Negative for visual separation
+                backgroundColor: 'rgba(99, 102, 241, 0.6)', // Indigo-500
+                borderColor: 'rgba(99, 102, 241, 1)',
+                borderWidth: 1,
+                order: 5
+            }
+        ];
+
+        if (energyChartInstance) {
+            energyChartInstance.data.labels = labels;
+            energyChartInstance.data.datasets = datasets;
+            energyChartInstance.update();
+        } else {
+            energyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, title: { display: true, text: 'Energy (kWh)' }, grid: { color: '#f1f5f9' } }
+                    },
+                    plugins: {
+                        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, usePointStyle: true } },
+                        tooltip: { 
+                            backgroundColor: '#1e293b', 
+                            titleColor: '#f8fafc', 
+                            bodyColor: '#f8fafc',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) { label += Math.abs(context.parsed.y).toFixed(2) + ' kWh'; }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Generates or updates the State of Charge (SoC) chart.
+     * @param {Array<Object>} dailyData - The data for the selected day.
+     */
+    function generateSocChart(dailyData) {
+        const ctx = document.getElementById('socChart').getContext('2d');
+        const labels = dailyData.map(d => d.timeLabel);
+        const data = dailyData.map(d => d.batterySoC);
+
+        if (socChartInstance) {
+            socChartInstance.data.labels = labels;
+            socChartInstance.data.datasets[0].data = data;
+            socChartInstance.update();
+        } else {
+            socChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Battery SoC (%)',
+                        data: data,
+                        borderColor: '#10b981', // Emerald-500
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { display: false }, // Hide X axis to align with energy chart
+                        y: { min: 0, max: 100, title: { display: true, text: 'SoC %' }, grid: { color: '#f1f5f9' } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { 
+                            backgroundColor: '#1e293b',
+                            callbacks: { label: (context) => `SoC: ${context.parsed.y.toFixed(1)}%` } 
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Generates or updates the monthly consumption chart.
+     * @param {Array<number>} monthlyData - Array of 12 monthly consumption totals.
+     */
+    function generateMonthlyConsumptionChart(monthlyData) {
+        const ctx = document.getElementById('monthlyConsumptionChart').getContext('2d');
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        if (monthlyConsumptionChartInstance) {
+            monthlyConsumptionChartInstance.data.datasets[0].data = monthlyData;
+            monthlyConsumptionChartInstance.update();
+        } else {
+            monthlyConsumptionChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Consumption (kWh)',
+                        data: monthlyData,
+                        backgroundColor: '#3b82f6', // Blue-500
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: '#1e293b' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Generates or updates the optimization chart.
+     * @param {Array<Object>} optimizationData - Data points for the chart.
+     * @param {number} currentBatterySize - The currently selected battery size.
+     */
+    function generateOptimizationChart(optimizationData, currentBatterySize) {
+        const ctx = document.getElementById('optimizationChart').getContext('2d');
+        
+        // Prepare datasets for each strategy
+        const strategies = [
+            { key: 'selfConsumption', label: 'Self-Consumption', color: '#3b82f6' }, // Blue
+            { key: 'exportMaximiser', label: 'Export Maximiser', color: '#8b5cf6' }, // Violet
+            { key: 'balancedExportMaximiser', label: 'Balanced Export', color: '#ec4899' }, // Pink
+            { key: 'importMinimiser', label: 'Import Minimiser', color: '#10b981' } // Emerald
+        ];
+
+        const datasets = strategies.map(s => ({
+            label: s.label,
+            data: optimizationData.map(d => ({ x: d.size, y: d.savings[s.key] })),
+            borderColor: s.color,
+            backgroundColor: s.color,
+            pointRadius: (ctx) => ctx.raw.x === currentBatterySize ? 8 : 4,
+            pointHoverRadius: 8,
+            showLine: true,
+            tension: 0.3
+        }));
+
+        if (optimizationChartInstance) {
+            optimizationChartInstance.data.datasets = datasets;
+            optimizationChartInstance.update();
+        } else {
+            optimizationChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Battery Size (kWh)' }, grid: { color: '#f1f5f9' } },
+                        y: { title: { display: true, text: 'Annual Savings (€)' }, grid: { color: '#f1f5f9' } }
+                    },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            callbacks: {
+                                label: (context) => `${context.dataset.label}: €${context.parsed.y.toFixed(2)}`
+                            }
+                        },
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+        
+        document.getElementById('optimizationChartContainer').classList.remove('hidden');
+    }
+
+    /**
+     * Generates or updates the PVGIS monthly generation chart.
+     * @param {Array<number>} monthlyData - Array of 12 monthly generation totals.
+     */
+    function generatePvgisMonthlyChart(monthlyData) {
+        const ctx = document.getElementById('pvgisMonthlyChart').getContext('2d');
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        if (pvgisMonthlyChartInstance) {
+            pvgisMonthlyChartInstance.data.datasets[0].data = monthlyData;
+            pvgisMonthlyChartInstance.update();
+        } else {
+            pvgisMonthlyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Estimated Generation (kWh)',
+                        data: monthlyData,
+                        backgroundColor: '#f59e0b', // Amber-500
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: '#1e293b' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
         }
     }
 
